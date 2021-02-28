@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<thing:thing-descriptions bindingId="proxmox"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:thing="https://openhab.org/schemas/thing-description/v1.0.0"
+	xsi:schemaLocation="https://openhab.org/schemas/thing-description/v1.0.0 https://openhab.org/schemas/thing-description-1.0.0.xsd">
+
+	<bridge-type id="host">
+		<label>Proxmox Host</label>
+		<description>The Proxmox host</description>
+
+		<config-description>
+			<parameter name="baseUrl" type="text" required="true">
+				<label>Host URL</label>
+				<description>The base URL of the Proxmox VE api, e.g. https://pve:8006/</description>
+				<context>url</context>
+			</parameter>
+
+			<parameter name="username" type="text" required="true">
+				<label>User Name</label>
+				<description>User Name for the Proxmox REST API including the realm, e.g. openhab@pam. Must have the proper access
+					rights.</description>
+			</parameter>
+
+			<parameter name="password" type="text" required="true">
+				<label>Password</label>
+				<description>Password for the Proxmox REST API.</description>
+				<context>password</context>
+			</parameter>
+
+			<parameter name="pollingInterval" type="integer" min="1" step="1" unit="s">
+				<label>Polling interval</label>
+				<description>Seconds between fetching values from the Proxmox API. Default is 30.</description>
+				<default>30</default>
+			</parameter>
+		</config-description>
+	</bridge-type>
+
+	<!-- Sample Thing Type -->
+	<thing-type id="node">
+		<supported-bridge-type-refs>
+			<bridge-type-ref id="host"/>
+		</supported-bridge-type-refs>
+
+		<label>Proxmox Node</label>
+		<description>A node of a Proxmox VE (cluster)</description>
+
+		<channels>
+			<channel id="power" typeId="system.power"/>
+		</channels>
+
+		<properties>
+			<property name="type">type</property>
+			<property name="version">version</property>
+		</properties>
+		<representation-property>id</representation-property>
+
+	</thing-type>
+
+	<thing-type id="vm">
+		<supported-bridge-type-refs>
+			<bridge-type-ref id="host"/>
+		</supported-bridge-type-refs>
+
+		<label>Proxmox VM</label>
+		<description>A virtual machine of a Proxmox VE node</description>
+
+		<channels>
+			<channel id="power" typeId="system.power"/>
+		</channels>
+
+		<properties>
+			<property name="node">node</property>
+		</properties>
+		<representation-property>id</representation-property>
+
+	</thing-type>
+
+	<thing-type id="lxc">
+		<supported-bridge-type-refs>
+			<bridge-type-ref id="host"/>
+		</supported-bridge-type-refs>
+
+		<label>Proxmox LXC</label>
+		<description>A Linux container of a Proxmox VE node</description>
+
+		<channels>
+			<channel id="power" typeId="system.power"/>
+		</channels>
+
+	</thing-type>
+
+</thing:thing-descriptions>
