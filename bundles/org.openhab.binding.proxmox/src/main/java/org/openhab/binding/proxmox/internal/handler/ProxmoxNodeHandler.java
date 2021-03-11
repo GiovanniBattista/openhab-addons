@@ -16,6 +16,7 @@ import static org.openhab.binding.proxmox.internal.ProxmoxBindingConstants.*;
 
 import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jdt.annotation.Nullable;
+import org.openhab.binding.proxmox.internal.ProxmoxBindingConstants;
 import org.openhab.binding.proxmox.internal.api.ProxmoxVEApi;
 import org.openhab.binding.proxmox.internal.api.exception.ProxmoxApiCommunicationException;
 import org.openhab.binding.proxmox.internal.api.exception.ProxmoxApiConfigurationException;
@@ -32,6 +33,7 @@ import org.openhab.core.thing.ThingStatusDetail;
 import org.openhab.core.thing.ThingStatusInfo;
 import org.openhab.core.thing.binding.BaseThingHandler;
 import org.openhab.core.types.Command;
+import org.openhab.core.types.RefreshType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -115,6 +117,11 @@ public class ProxmoxNodeHandler extends BaseThingHandler implements ProxmoxStatu
             return;
         }
 
+        if (command == RefreshType.REFRESH) {
+            refreshChannelStates();
+            return;
+        }
+
         try {
             String channel = channelUID.getId();
             switch (channel) {
@@ -136,6 +143,12 @@ public class ProxmoxNodeHandler extends BaseThingHandler implements ProxmoxStatu
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR, ex.getMessage());
         } catch (ProxmoxApiConfigurationException ex) {
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR, ex.getMessage());
+        }
+    }
+
+    private void refreshChannelStates() {
+        if (getThing().getStatus() == ThingStatus.OFFLINE) {
+            updateState(ProxmoxBindingConstants.CHANNEL_POWER, OnOffType.OFF);
         }
     }
 
