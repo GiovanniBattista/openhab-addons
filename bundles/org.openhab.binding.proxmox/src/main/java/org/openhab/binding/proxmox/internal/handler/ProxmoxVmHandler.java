@@ -15,6 +15,7 @@ package org.openhab.binding.proxmox.internal.handler;
 import static org.openhab.binding.proxmox.internal.ProxmoxBindingConstants.*;
 
 import org.eclipse.jdt.annotation.Nullable;
+import org.openhab.binding.proxmox.internal.ProxmoxBindingConstants;
 import org.openhab.binding.proxmox.internal.api.ProxmoxVEApi;
 import org.openhab.binding.proxmox.internal.api.exception.ProxmoxApiCommunicationException;
 import org.openhab.binding.proxmox.internal.api.exception.ProxmoxApiConfigurationException;
@@ -30,6 +31,7 @@ import org.openhab.core.thing.ThingStatusDetail;
 import org.openhab.core.thing.ThingStatusInfo;
 import org.openhab.core.thing.binding.BaseThingHandler;
 import org.openhab.core.types.Command;
+import org.openhab.core.types.RefreshType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -97,6 +99,12 @@ public class ProxmoxVmHandler extends BaseThingHandler implements ProxmoxStatusC
         }
     }
 
+    private void refreshChannelStates() {
+        if (getThing().getStatus() == ThingStatus.OFFLINE) {
+            updateState(ProxmoxBindingConstants.CHANNEL_POWER, OnOffType.OFF);
+        }
+    }
+
     @Override
     public void handleCommand(ChannelUID channelUID, Command command) {
         ProxmoxHostBridgeHandler bridgeHandler = ProxmoxHostBridgeHandlerHelper.getBridgeHandler(getBridge());
@@ -118,6 +126,11 @@ public class ProxmoxVmHandler extends BaseThingHandler implements ProxmoxStatusC
         ProxmoxVm vm = bridgeHandler.getVmById(vmId);
         if (vm == null) {
             logger.debug("The VM is not known to the bridge. Cannot handle command!");
+            return;
+        }
+
+        if (command == RefreshType.REFRESH) {
+            refreshChannelStates();
             return;
         }
 
