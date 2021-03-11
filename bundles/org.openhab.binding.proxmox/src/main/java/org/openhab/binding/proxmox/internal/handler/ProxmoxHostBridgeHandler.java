@@ -1,5 +1,7 @@
 package org.openhab.binding.proxmox.internal.handler;
 
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -74,6 +76,13 @@ public class ProxmoxHostBridgeHandler extends BaseBridgeHandler {
         if (config.getBaseUrl() == null || config.getBaseUrl().isEmpty()) {
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR, "No base url set");
             return;
+        }
+
+        try {
+            new URL(config.getBaseUrl());
+        } catch (MalformedURLException ex) {
+            updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR,
+                    "Invalid base url: " + ex.getMessage());
         }
 
         if (config.getUsername() == null || config.getUsername().isEmpty()) {
@@ -186,22 +195,17 @@ public class ProxmoxHostBridgeHandler extends BaseBridgeHandler {
         public void run() {
             try {
                 pollingLock.lock();
-                if (!bridgeConnectedToHost) {
-                    bridgeConnectedToHost = tryResumeHostConnection();
-                }
 
-                if (bridgeConnectedToHost) {
-                    try {
-                        fetchStatusUpdates();
+                try {
+                    fetchStatusUpdates();
 
-                        if (thing.getStatus() != ThingStatus.ONLINE) {
-                            updateStatus(ThingStatus.ONLINE);
-                        }
-                    } catch (ProxmoxApiCommunicationException e) {
-                        updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR, e.getMessage());
-                    } catch (ProxmoxApiConfigurationException e) {
-                        updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR, e.getMessage());
+                    if (thing.getStatus() != ThingStatus.ONLINE) {
+                        updateStatus(ThingStatus.ONLINE);
                     }
+                } catch (ProxmoxApiCommunicationException e) {
+                    updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR, e.getMessage());
+                } catch (ProxmoxApiConfigurationException e) {
+                    updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR, e.getMessage());
                 }
             } finally {
                 pollingLock.unlock();
@@ -344,10 +348,6 @@ public class ProxmoxHostBridgeHandler extends BaseBridgeHandler {
             });
         }
     };
-
-    public boolean tryResumeHostConnection() {
-        return true;
-    }
 
     public @Nullable ProxmoxNode getNodeById(String nodeId) {
         return lastNodeStates.get(nodeId);
