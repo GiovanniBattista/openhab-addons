@@ -32,6 +32,13 @@ public class ProxmoxBindingConstants {
     public static final ThingTypeUID THING_TYPE_VM = new ThingTypeUID(BINDING_ID, "vm");
     public static final ThingTypeUID THING_TYPE_LXC = new ThingTypeUID(BINDING_ID, "lxc");
 
+    /*
+     * Config names must match property names in
+     * - parameter names in OH-INF/config/config.xml
+     * - property names in OH-INF/thing/thing-types.xml
+     */
+    public static final String CONFIG_MAC_ADDRESS = "macAddress";
+
     // List of all Channel ids
     public static final String CHANNEL_POWER = "power";
 

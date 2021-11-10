@@ -42,9 +42,14 @@ public class ProxmoxVmHandler extends BaseThingHandler implements ProxmoxStatusC
 
     private final Logger logger = LoggerFactory.getLogger(ProxmoxVmHandler.class);
 
+    // The minimum time in ms to skip the next update cycle if a command has been issued.
+    private static final int MIN_SKIP_UPDATE_CYCLE_TIME = 10000;
+
     private ProxmoxVmConfiguration config;
     private String nodeName;
     private String vmId;
+
+    private long endSkipTime = 0L;
 
     public ProxmoxVmHandler(Thing thing) {
         super(thing);
@@ -87,12 +92,10 @@ public class ProxmoxVmHandler extends BaseThingHandler implements ProxmoxStatusC
         if (bridgeHandler != null) {
             if (bridgeStatus == ThingStatus.ONLINE) {
                 bridgeHandler.registerVmStatusChangeListener(vmId, this);
-                // ProxmoxNode node = bridgeHandler.getNodeById(nodeName);
-                // TODO initializeProperties(node);
-                // TODO initializeCapabilities(node);
                 updateStatus(ThingStatus.ONLINE);
             } else {
                 updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.BRIDGE_OFFLINE);
+                updateState(CHANNEL_POWER, OnOffType.OFF);
             }
         } else {
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.BRIDGE_UNINITIALIZED);
@@ -146,6 +149,8 @@ public class ProxmoxVmHandler extends BaseThingHandler implements ProxmoxStatusC
                         } else if (powerState == OnOffType.ON) {
                             getApi().startVm(nodeName, vmId);
                         }
+                        updateState(channel, powerState);
+                        skipNextUpdateCylce();
                     }
             }
         } catch (ProxmoxApiCommunicationException ex) {
@@ -168,6 +173,10 @@ public class ProxmoxVmHandler extends BaseThingHandler implements ProxmoxStatusC
         }
     }
 
+    private void skipNextUpdateCylce() {
+        endSkipTime = System.currentTimeMillis() + MIN_SKIP_UPDATE_CYCLE_TIME;
+    }
+
     private ProxmoxVEApi getApi() {
         return ProxmoxHostBridgeHandlerHelper.getApi(getBridge());
     }
@@ -176,6 +185,11 @@ public class ProxmoxVmHandler extends BaseThingHandler implements ProxmoxStatusC
     @Override
     public boolean onStateChanged(ProxmoxVm vm) {
         logger.trace("onStateChanged was called!");
+
+        if (System.currentTimeMillis() <= endSkipTime) {
+            logger.debug("Skipping update cycle for id: " + vmId);
+            return false;
+        }
 
         // TODO Properly handle onStateChanged
         updateState(CHANNEL_POWER, OnOffType.from(vm.getStatus() == VmStatus.RUNNING));

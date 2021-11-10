@@ -27,6 +27,14 @@
 				<context>password</context>
 			</parameter>
 
+			<parameter name="macAddress" type="text" required="false">
+				<label>MAC Address</label>
+				<description>If MAC Address of the host is entered here, the binding will attempt to power on the host via Wake On
+					Lan
+					(WOL), when it receives command ON on channel power. Accepted value is six groups of two hexadecimal digits,
+					separated by hyphens or colons, e.g '3c:cd:93:c2:20:e0'.)</description>
+			</parameter>
+
 			<parameter name="pollingInterval" type="integer" min="1" step="1" unit="s">
 				<label>Polling interval</label>
 				<description>Seconds between fetching values from the Proxmox API. Default is 30.</description>

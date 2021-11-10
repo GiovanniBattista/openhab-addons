@@ -45,8 +45,13 @@ public class ProxmoxNodeHandler extends BaseThingHandler implements ProxmoxStatu
 
     private final Logger logger = LoggerFactory.getLogger(ProxmoxNodeHandler.class);
 
+    // The minimum time in ms to skip the next update cycle if a command has been issued.
+    private static final int MIN_SKIP_UPDATE_CYCLE_TIME = 30000;
+
     private ProxmoxNodeConfiguration config;
     private String nodeName;
+
+    private long endSkipTime = 0L;
 
     /**
      * @param thing
@@ -86,15 +91,14 @@ public class ProxmoxNodeHandler extends BaseThingHandler implements ProxmoxStatu
         if (bridgeHandler != null) {
             if (bridgeStatus == ThingStatus.ONLINE) {
                 bridgeHandler.registerNodeStatusChangeListener(nodeName, this);
-                // ProxmoxNode node = bridgeHandler.getNodeById(nodeName);
-                // TODO initializeProperties(node);
-                // TODO initializeCapabilities(node);
                 updateStatus(ThingStatus.ONLINE);
             } else {
                 updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.BRIDGE_OFFLINE);
+                updateState(CHANNEL_POWER, OnOffType.OFF);
             }
         } else {
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.BRIDGE_UNINITIALIZED);
+            updateState(CHANNEL_POWER, OnOffType.OFF);
         }
     }
 
@@ -111,8 +115,9 @@ public class ProxmoxNodeHandler extends BaseThingHandler implements ProxmoxStatu
             return;
         }
 
+        String channel = channelUID.getId();
         ProxmoxNode node = bridgeHandler.getNodeById(nodeName);
-        if (node == null) {
+        if (node == null && !CHANNEL_POWER.equals(channel)) {
             logger.debug("The node is not known to the bridge. Cannot handle command!");
             return;
         }
@@ -123,19 +128,25 @@ public class ProxmoxNodeHandler extends BaseThingHandler implements ProxmoxStatu
         }
 
         try {
-            String channel = channelUID.getId();
             switch (channel) {
                 case CHANNEL_POWER:
                     logger.trace("CHANNEL_POWER was changed to {}", command);
                     if (command instanceof OnOffType) {
                         OnOffType powerState = (OnOffType) command;
                         if (powerState == OnOffType.OFF) {
-                            // node was requested to poweroff, therefore use POST /nodes/{node}/status to shut down the
-                            // node
+                            // node was requested to poweroff, therefore use POST /nodes/{node}/status to shut down
+                            // the node
                             getApi().rebootShutdownNode(nodeName, StatusCommand.SHUTDOWN);
                         } else if (powerState == OnOffType.ON) {
-                            getApi().wakeonlanNode(nodeName);
+                            if (getThing().getStatus() == ThingStatus.OFFLINE) {
+                                // try to wakeOnLan the host/bridge
+                                bridgeHandler.wakeOnLan(nodeName);
+                            } else {
+                                getApi().wakeonlanNode(nodeName);
+                            }
                         }
+                        updateState(channel, powerState);
+                        skipNextUpdateCylce();
                     }
                     break;
             }
@@ -150,6 +161,10 @@ public class ProxmoxNodeHandler extends BaseThingHandler implements ProxmoxStatu
         if (getThing().getStatus() == ThingStatus.OFFLINE) {
             updateState(ProxmoxBindingConstants.CHANNEL_POWER, OnOffType.OFF);
         }
+    }
+
+    private void skipNextUpdateCylce() {
+        endSkipTime = System.currentTimeMillis() + MIN_SKIP_UPDATE_CYCLE_TIME;
     }
 
     private ProxmoxVEApi getApi() {
@@ -179,6 +194,12 @@ public class ProxmoxNodeHandler extends BaseThingHandler implements ProxmoxStatu
     public boolean onStateChanged(ProxmoxNode node) {
         logger.trace("onStateChanged was called!");
 
+        if (System.currentTimeMillis() <= endSkipTime) {
+            logger.debug("Skipping update cycle for id: " + nodeName);
+            return false;
+        }
+
+        // TODO Properly handle onStateChanged
         updateState(CHANNEL_POWER, OnOffType.from(node.getStatus() == NodeStatus.ONLINE));
 
         return true;
