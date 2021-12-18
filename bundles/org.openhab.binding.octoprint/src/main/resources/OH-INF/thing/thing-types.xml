@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<thing:thing-descriptions bindingId="octoprint"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:thing="https://openhab.org/schemas/thing-description/v1.0.0"
+	xsi:schemaLocation="https://openhab.org/schemas/thing-description/v1.0.0 https://openhab.org/schemas/thing-description-1.0.0.xsd">
+
+	<!-- Sample Thing Type -->
+	<thing-type id="octoprint">
+
+		<label>OctoPrint Binding</label>
+		<description>An OctoPrint instance</description>
+
+        <channels>
+          <channel typeId="currentTemperature" id="current-temperature-tool0">
+            <label>Current Temperature Tool 0</label>
+           </channel>
+          <channel typeId="targetTemperature"  id="target-temperature-tool0">
+            <label>Target Temperature Tool 0</label>
+          </channel> 
+          
+          <channel typeId="currentTemperature" id="current-temperature-bed">
+            <label>Current Temperature Bed</label>
+          </channel>
+          <channel typeId="targetTemperature" id="target-temperature-bed">
+            <label>Target Temperature Bed</label>
+          </channel>
+        </channels>
+        
+        <representation-property>uuid</representation-property>
+
+		<config-description>
+			<parameter name="hostname" type="text" required="true">
+				<context>network-address</context>
+				<label>Hostname</label>
+				<description>Hostname or IP address of the OctoPrint instance</description>
+			</parameter>
+			<parameter name="port" type="integer" required="true">
+				<label>Port</label>
+				<description>Port of the OctoPrint instance</description>
+				<advanced>true</advanced>
+				<default>80</default>
+			</parameter>
+			<parameter name="user" type="text">
+				<label>User</label>
+				<description>The OctoPrint user.</description>
+			</parameter>
+			<parameter name="path" type="text">
+			     <label>Path</label>
+			     <description>The base path of the OctoPrint API</description>
+			</parameter>
+			<parameter name="apiKey" type="text">
+				<label>API Key</label>
+				<description>If the Application Keys Plugin is enabled and activated in OctoPrint (comes bundled with OctoPrint),
+					the API key is retrieved through the API key workflow. If the plugin is not installed or disabled, the API key has
+					to be entered manually.</description>
+			</parameter>
+			<parameter name="refreshInterval" type="integer" unit="s" min="1">
+                <label>Refresh Interval</label>
+                <description>Interval the device is polled in sec.</description>
+            </parameter>
+		</config-description>
+		
+	</thing-type>
+
+	<channel-type id="currentTemperature">
+		<item-type>Number:Temperature</item-type>
+		<label>Current Temperature</label>
+		<description>The current temperature of the tool head.</description>
+		<category>Temperature</category>
+		<state readOnly="true" />
+	</channel-type>
+	
+	<channel-type id="targetTemperature">
+	   <item-type>Number:Temperature</item-type>
+	   <label>Target Temperature</label>
+	   <description>The target temperature of the tool head.</description>
+	   <category>Temperature</category>
+	</channel-type>
+</thing:thing-descriptions>
