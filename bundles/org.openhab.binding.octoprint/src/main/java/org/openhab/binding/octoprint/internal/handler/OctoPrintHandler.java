@@ -34,6 +34,7 @@ import org.openhab.binding.octoprint.internal.api.model.AuthorizationDecisionRes
 import org.openhab.binding.octoprint.internal.api.model.AuthorizationDecisionResponseCode;
 import org.openhab.binding.octoprint.internal.api.model.PrinterStateResponse;
 import org.openhab.binding.octoprint.internal.api.model.PrinterStateTemperatureContainer;
+import org.openhab.binding.octoprint.internal.api.model.RegisteredSystemCommandsResponse;
 import org.openhab.core.config.core.Configuration;
 import org.openhab.core.library.types.DecimalType;
 import org.openhab.core.thing.ChannelUID;
@@ -68,6 +69,8 @@ public class OctoPrintHandler extends BaseThingHandler {
     private @Nullable OctoPrintApi api;
     private HttpClient httpClient;
 
+    private @Nullable OctoPrintSystemCommandHandler systemCommandHandler;
+
     public OctoPrintHandler(Thing thing, HttpClient httpClient) {
         super(thing);
 
@@ -80,6 +83,9 @@ public class OctoPrintHandler extends BaseThingHandler {
 
         config = getConfigAs(OctoPrintConfiguration.class);
         api = OctoPrintApiFactory.create(config, httpClient);
+
+        systemCommandHandler = new OctoPrintSystemCommandHandler(getThing(), api);
+        systemCommandHandler.setCallback(getCallback());
 
         final String hostName = config.hostname;
         if (hostName == null || hostName.isBlank()) {
@@ -199,6 +205,8 @@ public class OctoPrintHandler extends BaseThingHandler {
             // updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR,
             // "Could not control device at IP address x.x.x.x");
         }
+
+        systemCommandHandler.handleCommand(channelUID, command);
     }
 
     abstract class AbstractPoller implements Runnable {
@@ -273,6 +281,10 @@ public class OctoPrintHandler extends BaseThingHandler {
 
             updateState(CHANNEL_CURRENT_TEMPERATURE_BED, new DecimalType(temperature.getBed().getActual()));
             updateState(CHANNEL_TARGET_TEMPERATURE_BED, new DecimalType(temperature.getBed().getTarget()));
+
+            RegisteredSystemCommandsResponse response = api.getSystemCommands();
+            systemCommandHandler.createSystemCommandChannels(response);
+
         }
     };
 

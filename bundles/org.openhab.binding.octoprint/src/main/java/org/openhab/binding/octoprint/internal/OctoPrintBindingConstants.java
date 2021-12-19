@@ -52,4 +52,6 @@ public class OctoPrintBindingConstants {
     public static final String CHANNEL_TARGET_TEMPERATURE_TOOL0 = "target-temperature-tool0";
     public static final String CHANNEL_CURRENT_TEMPERATURE_BED = "current-temperature-bed";
     public static final String CHANNEL_TARGET_TEMPERATURE_BED = "target-temperature-bed";
+
+    public static final String CHANNEL_SYSTEM_COMMAND_PREFIX = "system-channel-";
 }

@@ -21,6 +21,9 @@ import org.openhab.binding.octoprint.internal.api.model.ApiKeyRequest;
 import org.openhab.binding.octoprint.internal.api.model.AuthorizationDecisionResponse;
 import org.openhab.binding.octoprint.internal.api.model.AuthorizationDecisionResponseCode;
 import org.openhab.binding.octoprint.internal.api.model.PrinterStateResponse;
+import org.openhab.binding.octoprint.internal.api.model.RegisteredSystemCommandsResponse;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.gson.JsonObject;
 
@@ -29,6 +32,8 @@ import com.google.gson.JsonObject;
  *
  */
 public class OctoPrintApi {
+
+    private final Logger logger = LoggerFactory.getLogger(OctoPrintApi.class);
 
     private final OctoPrintApiContext context;
 
@@ -41,7 +46,7 @@ public class OctoPrintApi {
     }
 
     public boolean hasAppKeyWorkflowSupport() throws OctoPrintApiException {
-        ContentResponse response = OctoPrintApiRequestBuilder.newBuilder(context).get("/plugin/appkeys/probe").send()
+        ContentResponse response = OctoPrintApiRequestBuilder.newBuilder(context).path("/plugin/appkeys/probe").get()
                 .getResponse();
 
         int statusCode = response.getStatus();
@@ -56,8 +61,8 @@ public class OctoPrintApi {
      * @throws OctoPrintApiException
      */
     public String startAppKeyAuthorizationProcess(ApiKeyRequest request) throws OctoPrintApiException {
-        ContentResponse response = OctoPrintApiRequestBuilder.newBuilder(context).post("/plugin/appkeys/request")
-                .requestBody(request).send().getResponse();
+        ContentResponse response = OctoPrintApiRequestBuilder.newBuilder(context).path("/plugin/appkeys/request")
+                .requestBody(request).post().getResponse();
 
         int statusCode = response.getStatus();
         if (statusCode == HttpStatus.CREATED_201) {
@@ -69,7 +74,7 @@ public class OctoPrintApi {
 
     public AuthorizationDecisionResponse getAuthorizationDecision(String generatedEndpointUrl)
             throws OctoPrintApiException {
-        ContentResponse response = new OctoPrintApiRequestBuilder(context, generatedEndpointUrl).get().send()
+        ContentResponse response = new OctoPrintApiRequestBuilder(context, generatedEndpointUrl).path("").get()
                 .getResponse();
 
         int statusCode = response.getStatus();
@@ -86,8 +91,8 @@ public class OctoPrintApi {
 
     public PrinterStateResponse getPrinterState() throws OctoPrintApiException {
 
-        OctoPrintApiRequestBuilder builder = OctoPrintApiRequestBuilder.newBuilder(context).get("/api/printer")
-                .authenticate().send();
+        OctoPrintApiRequestBuilder builder = OctoPrintApiRequestBuilder.newBuilder(context).path("/api/printer")
+                .authenticate().get();
 
         int statusCode = builder.getResponse().getStatus();
         if (statusCode == HttpStatus.OK_200) {
@@ -96,6 +101,44 @@ public class OctoPrintApi {
             throw new OctoPrintApiCommunicationException("Printer is not operational");
         } else {
             throw new OctoPrintApiCommunicationException("Unknown error" + statusCode);
+        }
+    }
+
+    /**
+     * Returns all registered system commands
+     *
+     * @throws OctoPrintApiException
+     */
+    public RegisteredSystemCommandsResponse getSystemCommands() throws OctoPrintApiException {
+        RegisteredSystemCommandsResponse response = OctoPrintApiRequestBuilder.newBuilder(context)
+                .path("/api/system/commands").authenticate().get().getContent(RegisteredSystemCommandsResponse.class);
+
+        return response;
+    }
+
+    /**
+     * @param source
+     * @param action
+     * @throws OctoPrintApiException
+     */
+    public void executeSystemCommand(String source, String action) throws OctoPrintApiException {
+        ContentResponse response = OctoPrintApiRequestBuilder.newBuilder(context)
+                .path("/api/system/commands/{0}/{1}", source, action).authenticate().post().getResponse();
+
+        logger.debug("Executing system command /api/system/commands/{0}/{1}", source, action);
+
+        int statusCode = response.getStatus();
+        if (statusCode == HttpStatus.NO_CONTENT_204) {
+            logger.debug("Successfully executed system command /api/system/commands/{0}/{1}", source, action);
+        } else if (statusCode == HttpStatus.BAD_REQUEST_400) {
+            throw new OctoPrintApiCommunicationException(
+                    "Cannot execute system command '" + action + "'. Request was malformed!");
+        } else if (statusCode == HttpStatus.NOT_FOUND_404) {
+            throw new OctoPrintApiCommunicationException(
+                    "Command was not found for action '" + action + "' and source '" + source + "'");
+        } else if (statusCode == HttpStatus.INTERNAL_SERVER_ERROR_500) {
+            throw new OctoPrintApiCommunicationException(
+                    "An internal error occurred during execution of action '" + action + "'!");
         }
     }
 

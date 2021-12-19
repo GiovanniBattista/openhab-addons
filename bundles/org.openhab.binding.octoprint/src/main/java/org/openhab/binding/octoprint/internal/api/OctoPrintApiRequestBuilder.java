@@ -49,19 +49,8 @@ public class OctoPrintApiRequestBuilder {
         this.apiUrl = apiUrl;
     }
 
-    public OctoPrintApiRequestBuilder get() {
-        request = newRequest("");
-        return this;
-    }
-
-    public OctoPrintApiRequestBuilder get(String pathTemplate, String... pathTemplateValues) {
-        request = newRequest(MessageFormat.format(pathTemplate, (Object[]) pathTemplateValues)).method(HttpMethod.GET);
-        return this;
-    }
-
-    public OctoPrintApiRequestBuilder post(String pathTemplate, String... pathTemplateValues) {
-        request = newRequest(MessageFormat.format(pathTemplate, (Object[]) pathTemplateValues)).method(HttpMethod.POST)
-                .header("Content-Type", "application/json");
+    public OctoPrintApiRequestBuilder path(String pathTemplate, String... pathTemplateValues) {
+        request = newRequest(MessageFormat.format(pathTemplate, (Object[]) pathTemplateValues));
         return this;
     }
 
@@ -73,9 +62,28 @@ public class OctoPrintApiRequestBuilder {
                 .accept("application/json");
     }
 
+    public OctoPrintApiRequestBuilder get() throws OctoPrintApiException {
+
+        if (request == null) {
+            throw new IllegalStateException("Request was not properly build. Call .path first!");
+        }
+
+        request.method(HttpMethod.GET);
+        return send();
+    }
+
+    public OctoPrintApiRequestBuilder post() throws OctoPrintApiException {
+        if (request == null) {
+            throw new IllegalStateException("Request was not properly build. Call .path first!");
+        }
+
+        request.method(HttpMethod.POST).header("Content-Type", "application/json");
+        return send();
+    }
+
     public OctoPrintApiRequestBuilder requestBody(Object body) {
         if (request == null) {
-            throw new IllegalStateException("Request was not properly build. Call .get/.post first!");
+            throw new IllegalStateException("Request was not properly build. Call .path first!");
         }
 
         String json = context.getGson().toJson(body);
@@ -87,7 +95,7 @@ public class OctoPrintApiRequestBuilder {
     public OctoPrintApiRequestBuilder authenticate() {
 
         if (request == null) {
-            throw new IllegalStateException("Request was not properly build. Call .get/.post first!");
+            throw new IllegalStateException("Request was not properly build. Call .path first!");
         }
 
         if (context.getConfig() == null || context.getConfig().apiKey == null) {
@@ -100,20 +108,20 @@ public class OctoPrintApiRequestBuilder {
         return this;
     }
 
-    public OctoPrintApiRequestBuilder send() throws OctoPrintApiException {
+    private OctoPrintApiRequestBuilder send() throws OctoPrintApiException {
 
         if (request == null) {
-            throw new IllegalStateException("Request was not properly build. Call .get/.post first!");
+            throw new IllegalStateException("Request was not properly build. Call .path first!");
         }
 
         try {
             response = request.send();
         } catch (InterruptedException e) {
-            throw new OctoPrintApiCommunicationException("Request was interrupted", e);
+            throw new OctoPrintApiCommunicationException("Request was interrupted: " + e.getMessage(), e);
         } catch (TimeoutException e) {
-            throw new OctoPrintApiCommunicationException("Request - Timeout reached", e);
+            throw new OctoPrintApiCommunicationException("Request - Timeout reached: " + e.getMessage(), e);
         } catch (ExecutionException e) {
-            throw new OctoPrintApiCommunicationException("Request failed", e);
+            throw new OctoPrintApiCommunicationException("Request failed: " + e.getMessage(), e);
         }
 
         int statusCode = response.getStatus();
@@ -153,79 +161,4 @@ public class OctoPrintApiRequestBuilder {
         return apiUrl;
     }
 
-    // public <T> T getContent(Request request, Class<T> classToExtract) throws ProxmoxApiCommunicationException {
-    // T content;
-    // ContentResponse response;
-    // try {
-    // response = request.send();
-    // } catch (InterruptedException ex) {
-    // throw new ProxmoxApiCommunicationException("Request was interrupted", ex);
-    // } catch (TimeoutException ex) {
-    // throw new ProxmoxApiCommunicationException("Request - Timeout reached", ex);
-    // } catch (ExecutionException ex) {
-    // throw new ProxmoxApiCommunicationException("Request failed", ex);
-    // }
-    //
-    // int statusCode = response.getStatus();
-    // if (statusCode == HttpStatus.OK_200) {
-    // JsonObject responseContainer = context.getGson().fromJson(response.getContentAsString(), JsonObject.class);
-    // if (responseContainer != null && responseContainer.has("data")) {
-    // content = context.getGson().fromJson(responseContainer.get("data"), classToExtract);
-    // } else {
-    // throw new ProxmoxApiCommunicationException("No content was provided in response");
-    // }
-    // } else {
-    // throw new ProxmoxApiCommunicationException(
-    // "API call returned invalid status code. StatusCode=" + statusCode);
-    // }
-    // return content;
-    // }
-    //
-    // public <T> List<T> getContentAsList(Request request, Type collectionType) throws ProxmoxApiCommunicationException
-    // {
-    // List<T> content;
-    // ContentResponse response;
-    // try {
-    // response = request.send();
-    // } catch (InterruptedException ex) {
-    // throw new ProxmoxApiCommunicationException("Request was interrupted", ex);
-    // } catch (TimeoutException ex) {
-    // throw new ProxmoxApiCommunicationException("Request - Timeout reached", ex);
-    // } catch (ExecutionException ex) {
-    // throw new ProxmoxApiCommunicationException("Request failed", ex);
-    // }
-    //
-    // int statusCode = response.getStatus();
-    // if (statusCode == HttpStatus.OK_200) {
-    // JsonObject responseContainer = context.getGson().fromJson(response.getContentAsString(), JsonObject.class);
-    // if (responseContainer != null && responseContainer.has("data")) {
-    // content = context.getGson().fromJson(responseContainer.get("data"), collectionType);
-    // } else {
-    // throw new ProxmoxApiCommunicationException("No content was provided in response");
-    // }
-    // } else {
-    // throw new ProxmoxApiCommunicationException(
-    // "API call returned invalid status code. StatusCode=" + statusCode);
-    // }
-    // return content;
-    // }
-    //
-    // public void sendRequest(Request request) throws ProxmoxApiCommunicationException {
-    // ContentResponse response;
-    // try {
-    // response = request.send();
-    // } catch (InterruptedException ex) {
-    // throw new ProxmoxApiCommunicationException("Request was interrupted", ex);
-    // } catch (TimeoutException ex) {
-    // throw new ProxmoxApiCommunicationException("Request - Timeout reached", ex);
-    // } catch (ExecutionException ex) {
-    // throw new ProxmoxApiCommunicationException("Request failed", ex);
-    // }
-    //
-    // int statusCode = response.getStatus();
-    // if (statusCode != HttpStatus.OK_200) {
-    // throw new ProxmoxApiCommunicationException(
-    // "API call returned invalid status code. StatusCode=" + statusCode);
-    // }
-    // }
 }
