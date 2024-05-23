@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2021 Contributors to the openHAB project
+ * Copyright (c) 2010-2024 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -15,12 +15,12 @@ package org.openhab.binding.amazonechocontrol.internal;
 import static org.openhab.binding.amazonechocontrol.internal.AmazonEchoControlBindingConstants.*;
 
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.net.URISyntaxException;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
+import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -88,11 +88,14 @@ public class AccountServlet extends HttpServlet {
         this.gson = gson;
 
         try {
-            servletUrlWithoutRoot = "amazonechocontrol/" + URLEncoder.encode(id, "UTF8");
+            servletUrlWithoutRoot = "amazonechocontrol/" + URLEncoder.encode(id, StandardCharsets.UTF_8);
             servletUrl = "/" + servletUrlWithoutRoot;
 
-            httpService.registerServlet(servletUrl, this, null, httpService.createDefaultHttpContext());
-        } catch (UnsupportedEncodingException | NamespaceException | ServletException e) {
+            Hashtable<Object, Object> initParams = new Hashtable<>();
+            initParams.put("servlet-name", servletUrl);
+
+            httpService.registerServlet(servletUrl, this, initParams, httpService.createDefaultHttpContext());
+        } catch (NamespaceException | ServletException e) {
             throw new IllegalStateException(e.getMessage());
         }
     }
@@ -146,7 +149,7 @@ public class AccountServlet extends HttpServlet {
         }
 
         Connection connection = this.account.findConnection();
-        if (connection != null && uri.equals("/changedomain")) {
+        if (connection != null && "/changedomain".equals(uri)) {
             Map<String, String[]> map = req.getParameterMap();
             String[] domainArray = map.get("domain");
             if (domainArray == null) {
@@ -200,7 +203,7 @@ public class AccountServlet extends HttpServlet {
             postDataBuilder.append(name);
             postDataBuilder.append('=');
             String value = "";
-            if (name.equals("failedSignInCount")) {
+            if ("failedSignInCount".equals(name)) {
                 value = "ape:AA==";
             } else {
                 String[] strings = map.get(name);
@@ -278,29 +281,29 @@ public class AccountServlet extends HttpServlet {
 
             if (connection != null && connection.verifyLogin()) {
                 // handle commands
-                if (baseUrl.equals("/logout") || baseUrl.equals("/logout/")) {
+                if ("/logout".equals(baseUrl) || "/logout/".equals(baseUrl)) {
                     this.connectionToInitialize = reCreateConnection();
                     this.account.setConnection(null);
                     resp.sendRedirect(this.servletUrl);
                     return;
                 }
                 // handle commands
-                if (baseUrl.equals("/newdevice") || baseUrl.equals("/newdevice/")) {
+                if ("/newdevice".equals(baseUrl) || "/newdevice/".equals(baseUrl)) {
                     this.connectionToInitialize = new Connection(null, this.gson);
                     this.account.setConnection(null);
                     resp.sendRedirect(this.servletUrl);
                     return;
                 }
 
-                if (baseUrl.equals("/devices") || baseUrl.equals("/devices/")) {
+                if ("/devices".equals(baseUrl) || "/devices/".equals(baseUrl)) {
                     handleDevices(resp, connection);
                     return;
                 }
-                if (baseUrl.equals("/changeDomain") || baseUrl.equals("/changeDomain/")) {
+                if ("/changeDomain".equals(baseUrl) || "/changeDomain/".equals(baseUrl)) {
                     handleChangeDomain(resp, connection);
                     return;
                 }
-                if (baseUrl.equals("/ids") || baseUrl.equals("/ids/")) {
+                if ("/ids".equals(baseUrl) || "/ids/".equals(baseUrl)) {
                     String serialNumber = getQueryMap(queryString).get("serialNumber");
                     Device device = account.findDeviceJson(serialNumber);
                     if (device != null) {
@@ -319,7 +322,7 @@ public class AccountServlet extends HttpServlet {
                 this.connectionToInitialize = connection;
             }
 
-            if (!uri.equals("/")) {
+            if (!"/".equals(uri)) {
                 String newUri = req.getServletPath() + "/";
                 resp.sendRedirect(newUri);
                 return;
@@ -340,12 +343,7 @@ public class AccountServlet extends HttpServlet {
                 String[] elements = param.split("=");
                 if (elements.length == 2) {
                     String name = elements[0];
-                    String value = "";
-                    try {
-                        value = URLDecoder.decode(elements[1], "UTF8");
-                    } catch (UnsupportedEncodingException e) {
-                        logger.info("Unsupported encoding", e);
-                    }
+                    String value = URLDecoder.decode(elements[1], StandardCharsets.UTF_8);
                     map.put(name, value);
                 }
             }

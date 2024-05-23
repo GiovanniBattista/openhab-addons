@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2021 Contributors to the openHAB project
+ * Copyright (c) 2010-2024 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -14,7 +14,6 @@ package org.openhab.binding.touchwand.internal;
 
 import static org.openhab.binding.touchwand.internal.TouchWandBindingConstants.*;
 
-import java.io.UnsupportedEncodingException;
 import java.net.CookieManager;
 import java.net.MalformedURLException;
 import java.net.URL;
@@ -77,7 +76,7 @@ public class TouchWandRestClient {
 
     private static final int REQUEST_TIMEOUT_SEC = 10;
 
-    private static final Map<String, String> COMMAND_MAP = new HashMap<String, String>();
+    private static final Map<String, String> COMMAND_MAP = new HashMap<>();
     static {
         COMMAND_MAP.put(CMD_LOGIN, "/auth/login?");
         COMMAND_MAP.put(CMD_LIST_UNITS, "/units/listUnits");
@@ -104,20 +103,13 @@ public class TouchWandRestClient {
     }
 
     private final boolean cmdLogin(String user, String pass, String ipAddr) {
-        String encodedUser;
-        String encodedPass;
+        String encodedUser = URLEncoder.encode(user, StandardCharsets.UTF_8);
+        String encodedPass = URLEncoder.encode(pass, StandardCharsets.UTF_8);
         String response = "";
+        String command = buildUrl(CMD_LOGIN) + "user=" + encodedUser + "&" + "psw=" + encodedPass;
+        response = sendCommand(command, METHOD_GET, "");
 
-        try {
-            encodedUser = URLEncoder.encode(user, StandardCharsets.UTF_8.toString());
-            encodedPass = URLEncoder.encode(pass, StandardCharsets.UTF_8.toString());
-            String command = buildUrl(CMD_LOGIN) + "user=" + encodedUser + "&" + "psw=" + encodedPass;
-            response = sendCommand(command, METHOD_GET, "");
-        } catch (UnsupportedEncodingException e) {
-            logger.warn("Error url encoding username or password : {}", e.getMessage());
-        }
-
-        return !response.equals("Unauthorized");
+        return !"Unauthorized".equals(response);
     }
 
     public String cmdListUnits() {
@@ -211,8 +203,7 @@ public class TouchWandRestClient {
     }
 
     private String buildUrl(String command) {
-        String url = "http://" + touchWandIpAddr + ":" + touchWandPort + COMMAND_MAP.get(command);
-        return url;
+        return "http://" + touchWandIpAddr + ":" + touchWandPort + COMMAND_MAP.get(command);
     }
 
     private synchronized String sendCommand(String command, HttpMethod method, String content) {
@@ -238,7 +229,7 @@ public class TouchWandRestClient {
             response = request.send();
             return response.getContentAsString();
         } catch (InterruptedException | TimeoutException | ExecutionException e) {
-            logger.warn("Error opening connecton to {} : {} ", touchWandIpAddr, e.getMessage());
+            logger.warn("Error opening connection to {} : {} ", touchWandIpAddr, e.getMessage());
         }
         return "";
     }

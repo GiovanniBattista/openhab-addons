@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2021 Contributors to the openHAB project
+ * Copyright (c) 2010-2024 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -124,7 +124,7 @@ public class SenecHomeHandler extends BaseThingHandler {
     @Override
     public void initialize() {
         config = getConfigAs(SenecHomeConfigurationDTO.class);
-        senecHomeApi.setHostname(config.hostname);
+        senecHomeApi.setHostname("%s://%s".formatted(config.useHttp ? "http" : "https", config.hostname));
         refreshJob = scheduler.scheduleWithFixedDelay(this::refresh, 0, config.refreshInterval, TimeUnit.SECONDS);
         limitationStatus = null;
     }
@@ -197,64 +197,64 @@ public class SenecHomeHandler extends BaseThingHandler {
             updateQtyState(CHANNEL_SENEC_GRID_VOLTAGE_PH3, response.grid.currentGridVoltagePerPhase[2], 2, Units.VOLT);
             updateQtyState(CHANNEL_SENEC_GRID_FREQUENCY, response.grid.currentGridFrequency, 2, Units.HERTZ);
 
-            updateQtyState(CHANNEL_SENEC_LIVE_BAT_CHARGE, response.statistics.liveBatCharge, 2, Units.KILOWATT_HOUR);
-            updateQtyState(CHANNEL_SENEC_LIVE_BAT_DISCHARGE, response.statistics.liveBatDischarge, 2,
-                    Units.KILOWATT_HOUR);
-            updateQtyState(CHANNEL_SENEC_LIVE_GRID_IMPORT, response.statistics.liveGridImport, 2, Units.KILOWATT_HOUR);
-            updateQtyState(CHANNEL_SENEC_LIVE_GRID_EXPORT, response.statistics.liveGridExport, 2, Units.KILOWATT_HOUR);
-            updateQtyState(CHANNEL_SENEC_LIVE_HOUSE_CONSUMPTION, response.statistics.liveHouseConsumption, 2,
-                    Units.KILOWATT_HOUR);
-            updateQtyState(CHANNEL_SENEC_LIVE_POWER_GENERATOR, response.statistics.livePowerGenerator, 2,
-                    Units.KILOWATT_HOUR);
-            if (response.statistics.liveWallboxEnergy != null) {
-                updateQtyState(CHANNEL_SENEC_LIVE_ENERGY_WALLBOX1, response.statistics.liveWallboxEnergy[0], 2,
-                        Units.KILOWATT_HOUR, DIVISOR_ISO_TO_KILO);
+            if (response.battery.chargedEnergy != null) {
+                updateQtyState(CHANNEL_SENEC_CHARGED_ENERGY_PACK1, response.battery.chargedEnergy[0], 2,
+                        Units.KILOWATT_HOUR, DIVISOR_MILLI_TO_KILO);
+                updateQtyState(CHANNEL_SENEC_CHARGED_ENERGY_PACK2, response.battery.chargedEnergy[1], 2,
+                        Units.KILOWATT_HOUR, DIVISOR_MILLI_TO_KILO);
+                updateQtyState(CHANNEL_SENEC_CHARGED_ENERGY_PACK3, response.battery.chargedEnergy[2], 2,
+                        Units.KILOWATT_HOUR, DIVISOR_MILLI_TO_KILO);
+                updateQtyState(CHANNEL_SENEC_CHARGED_ENERGY_PACK4, response.battery.chargedEnergy[3], 2,
+                        Units.KILOWATT_HOUR, DIVISOR_MILLI_TO_KILO);
             }
-
-            updateQtyState(CHANNEL_SENEC_CHARGED_ENERGY_PACK1, response.battery.chargedEnergy[0], 2,
-                    Units.KILOWATT_HOUR, DIVISOR_MILLI_TO_KILO);
-            updateQtyState(CHANNEL_SENEC_CHARGED_ENERGY_PACK2, response.battery.chargedEnergy[1], 2,
-                    Units.KILOWATT_HOUR, DIVISOR_MILLI_TO_KILO);
-            updateQtyState(CHANNEL_SENEC_CHARGED_ENERGY_PACK3, response.battery.chargedEnergy[2], 2,
-                    Units.KILOWATT_HOUR, DIVISOR_MILLI_TO_KILO);
-            updateQtyState(CHANNEL_SENEC_CHARGED_ENERGY_PACK4, response.battery.chargedEnergy[3], 2,
-                    Units.KILOWATT_HOUR, DIVISOR_MILLI_TO_KILO);
-            updateQtyState(CHANNEL_SENEC_DISCHARGED_ENERGY_PACK1, response.battery.dischargedEnergy[0], 2,
-                    Units.KILOWATT_HOUR, DIVISOR_MILLI_TO_KILO);
-            updateQtyState(CHANNEL_SENEC_DISCHARGED_ENERGY_PACK2, response.battery.dischargedEnergy[1], 2,
-                    Units.KILOWATT_HOUR, DIVISOR_MILLI_TO_KILO);
-            updateQtyState(CHANNEL_SENEC_DISCHARGED_ENERGY_PACK3, response.battery.dischargedEnergy[2], 2,
-                    Units.KILOWATT_HOUR, DIVISOR_MILLI_TO_KILO);
-            updateQtyState(CHANNEL_SENEC_DISCHARGED_ENERGY_PACK4, response.battery.dischargedEnergy[3], 2,
-                    Units.KILOWATT_HOUR, DIVISOR_MILLI_TO_KILO);
-            updateDecimalState(CHANNEL_SENEC_CYCLES_PACK1, response.battery.cycles[0]);
-            updateDecimalState(CHANNEL_SENEC_CYCLES_PACK2, response.battery.cycles[1]);
-            updateDecimalState(CHANNEL_SENEC_CYCLES_PACK3, response.battery.cycles[2]);
-            updateDecimalState(CHANNEL_SENEC_CYCLES_PACK4, response.battery.cycles[3]);
-            updateQtyState(CHANNEL_SENEC_CURRENT_PACK1, response.battery.current[0], 2, Units.AMPERE);
-            updateQtyState(CHANNEL_SENEC_CURRENT_PACK2, response.battery.current[1], 2, Units.AMPERE);
-            updateQtyState(CHANNEL_SENEC_CURRENT_PACK3, response.battery.current[2], 2, Units.AMPERE);
-            updateQtyState(CHANNEL_SENEC_CURRENT_PACK4, response.battery.current[3], 2, Units.AMPERE);
-            updateQtyState(CHANNEL_SENEC_VOLTAGE_PACK1, response.battery.voltage[0], 2, Units.VOLT);
-            updateQtyState(CHANNEL_SENEC_VOLTAGE_PACK2, response.battery.voltage[1], 2, Units.VOLT);
-            updateQtyState(CHANNEL_SENEC_VOLTAGE_PACK3, response.battery.voltage[2], 2, Units.VOLT);
-            updateQtyState(CHANNEL_SENEC_VOLTAGE_PACK4, response.battery.voltage[3], 2, Units.VOLT);
-            updateQtyState(CHANNEL_SENEC_MAX_CELL_VOLTAGE_PACK1, response.battery.maxCellVoltage[0], 3, Units.VOLT,
-                    DIVISOR_MILLI_TO_ISO);
-            updateQtyState(CHANNEL_SENEC_MAX_CELL_VOLTAGE_PACK2, response.battery.maxCellVoltage[1], 3, Units.VOLT,
-                    DIVISOR_MILLI_TO_ISO);
-            updateQtyState(CHANNEL_SENEC_MAX_CELL_VOLTAGE_PACK3, response.battery.maxCellVoltage[2], 3, Units.VOLT,
-                    DIVISOR_MILLI_TO_ISO);
-            updateQtyState(CHANNEL_SENEC_MAX_CELL_VOLTAGE_PACK4, response.battery.maxCellVoltage[3], 3, Units.VOLT,
-                    DIVISOR_MILLI_TO_ISO);
-            updateQtyState(CHANNEL_SENEC_MIN_CELL_VOLTAGE_PACK1, response.battery.minCellVoltage[0], 3, Units.VOLT,
-                    DIVISOR_MILLI_TO_ISO);
-            updateQtyState(CHANNEL_SENEC_MIN_CELL_VOLTAGE_PACK2, response.battery.minCellVoltage[1], 3, Units.VOLT,
-                    DIVISOR_MILLI_TO_ISO);
-            updateQtyState(CHANNEL_SENEC_MIN_CELL_VOLTAGE_PACK3, response.battery.minCellVoltage[2], 3, Units.VOLT,
-                    DIVISOR_MILLI_TO_ISO);
-            updateQtyState(CHANNEL_SENEC_MIN_CELL_VOLTAGE_PACK4, response.battery.minCellVoltage[3], 3, Units.VOLT,
-                    DIVISOR_MILLI_TO_ISO);
+            if (response.battery.dischargedEnergy != null) {
+                updateQtyState(CHANNEL_SENEC_DISCHARGED_ENERGY_PACK1, response.battery.dischargedEnergy[0], 2,
+                        Units.KILOWATT_HOUR, DIVISOR_MILLI_TO_KILO);
+                updateQtyState(CHANNEL_SENEC_DISCHARGED_ENERGY_PACK2, response.battery.dischargedEnergy[1], 2,
+                        Units.KILOWATT_HOUR, DIVISOR_MILLI_TO_KILO);
+                updateQtyState(CHANNEL_SENEC_DISCHARGED_ENERGY_PACK3, response.battery.dischargedEnergy[2], 2,
+                        Units.KILOWATT_HOUR, DIVISOR_MILLI_TO_KILO);
+                updateQtyState(CHANNEL_SENEC_DISCHARGED_ENERGY_PACK4, response.battery.dischargedEnergy[3], 2,
+                        Units.KILOWATT_HOUR, DIVISOR_MILLI_TO_KILO);
+            }
+            if (response.battery.cycles != null) {
+                updateDecimalState(CHANNEL_SENEC_CYCLES_PACK1, response.battery.cycles[0]);
+                updateDecimalState(CHANNEL_SENEC_CYCLES_PACK2, response.battery.cycles[1]);
+                updateDecimalState(CHANNEL_SENEC_CYCLES_PACK3, response.battery.cycles[2]);
+                updateDecimalState(CHANNEL_SENEC_CYCLES_PACK4, response.battery.cycles[3]);
+            }
+            if (response.battery.current != null) {
+                updateQtyState(CHANNEL_SENEC_CURRENT_PACK1, response.battery.current[0], 2, Units.AMPERE);
+                updateQtyState(CHANNEL_SENEC_CURRENT_PACK2, response.battery.current[1], 2, Units.AMPERE);
+                updateQtyState(CHANNEL_SENEC_CURRENT_PACK3, response.battery.current[2], 2, Units.AMPERE);
+                updateQtyState(CHANNEL_SENEC_CURRENT_PACK4, response.battery.current[3], 2, Units.AMPERE);
+            }
+            if (response.battery.voltage != null) {
+                updateQtyState(CHANNEL_SENEC_VOLTAGE_PACK1, response.battery.voltage[0], 2, Units.VOLT);
+                updateQtyState(CHANNEL_SENEC_VOLTAGE_PACK2, response.battery.voltage[1], 2, Units.VOLT);
+                updateQtyState(CHANNEL_SENEC_VOLTAGE_PACK3, response.battery.voltage[2], 2, Units.VOLT);
+                updateQtyState(CHANNEL_SENEC_VOLTAGE_PACK4, response.battery.voltage[3], 2, Units.VOLT);
+            }
+            if (response.battery.maxCellVoltage != null) {
+                updateQtyState(CHANNEL_SENEC_MAX_CELL_VOLTAGE_PACK1, response.battery.maxCellVoltage[0], 3, Units.VOLT,
+                        DIVISOR_MILLI_TO_ISO);
+                updateQtyState(CHANNEL_SENEC_MAX_CELL_VOLTAGE_PACK2, response.battery.maxCellVoltage[1], 3, Units.VOLT,
+                        DIVISOR_MILLI_TO_ISO);
+                updateQtyState(CHANNEL_SENEC_MAX_CELL_VOLTAGE_PACK3, response.battery.maxCellVoltage[2], 3, Units.VOLT,
+                        DIVISOR_MILLI_TO_ISO);
+                updateQtyState(CHANNEL_SENEC_MAX_CELL_VOLTAGE_PACK4, response.battery.maxCellVoltage[3], 3, Units.VOLT,
+                        DIVISOR_MILLI_TO_ISO);
+            }
+            if (response.battery.minCellVoltage != null) {
+                updateQtyState(CHANNEL_SENEC_MIN_CELL_VOLTAGE_PACK1, response.battery.minCellVoltage[0], 3, Units.VOLT,
+                        DIVISOR_MILLI_TO_ISO);
+                updateQtyState(CHANNEL_SENEC_MIN_CELL_VOLTAGE_PACK2, response.battery.minCellVoltage[1], 3, Units.VOLT,
+                        DIVISOR_MILLI_TO_ISO);
+                updateQtyState(CHANNEL_SENEC_MIN_CELL_VOLTAGE_PACK3, response.battery.minCellVoltage[2], 3, Units.VOLT,
+                        DIVISOR_MILLI_TO_ISO);
+                updateQtyState(CHANNEL_SENEC_MIN_CELL_VOLTAGE_PACK4, response.battery.minCellVoltage[3], 3, Units.VOLT,
+                        DIVISOR_MILLI_TO_ISO);
+            }
 
             if (response.temperature != null) {
                 updateQtyState(CHANNEL_SENEC_BATTERY_TEMPERATURE, response.temperature.batteryTemperature, 0,
@@ -326,7 +326,7 @@ public class SenecHomeHandler extends BaseThingHandler {
         } else {
             value = value.setScale(scale, RoundingMode.HALF_UP);
         }
-        updateState(channel.getUID(), new QuantityType<Q>(value, unit));
+        updateState(channel.getUID(), new QuantityType<>(value, unit));
     }
 
     protected BigDecimal getSenecValue(String value) {
@@ -399,7 +399,7 @@ public class SenecHomeHandler extends BaseThingHandler {
         }
 
         logger.debug("Updating power limitation state {}", status);
-        updateState(channel.getUID(), status ? OnOffType.ON : OnOffType.OFF);
+        updateState(channel.getUID(), OnOffType.from(status));
     }
 
     protected void updateGridPowerValues(BigDecimal gridTotalValue) {

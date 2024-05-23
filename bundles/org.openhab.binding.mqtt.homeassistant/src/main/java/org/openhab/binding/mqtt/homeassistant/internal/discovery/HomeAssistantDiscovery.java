@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2021 Contributors to the openHAB project
+ * Copyright (c) 2010-2024 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -16,15 +16,20 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
+import java.util.stream.Collector;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
@@ -34,9 +39,12 @@ import org.openhab.binding.mqtt.generic.MqttChannelTypeProvider;
 import org.openhab.binding.mqtt.homeassistant.generic.internal.MqttBindingConstants;
 import org.openhab.binding.mqtt.homeassistant.internal.HaID;
 import org.openhab.binding.mqtt.homeassistant.internal.HandlerConfiguration;
+import org.openhab.binding.mqtt.homeassistant.internal.HomeAssistantConfiguration;
 import org.openhab.binding.mqtt.homeassistant.internal.config.ChannelConfigurationTypeAdapterFactory;
 import org.openhab.binding.mqtt.homeassistant.internal.config.dto.AbstractChannelConfiguration;
 import org.openhab.binding.mqtt.homeassistant.internal.exception.ConfigurationException;
+import org.openhab.core.config.core.ConfigurableService;
+import org.openhab.core.config.core.Configuration;
 import org.openhab.core.config.discovery.DiscoveryResult;
 import org.openhab.core.config.discovery.DiscoveryResultBuilder;
 import org.openhab.core.config.discovery.DiscoveryService;
@@ -44,7 +52,10 @@ import org.openhab.core.io.transport.mqtt.MqttBrokerConnection;
 import org.openhab.core.thing.ThingTypeUID;
 import org.openhab.core.thing.ThingUID;
 import org.openhab.core.thing.type.ThingType;
+import org.osgi.framework.Constants;
+import org.osgi.service.component.annotations.Activate;
 import org.osgi.service.component.annotations.Component;
+import org.osgi.service.component.annotations.Modified;
 import org.osgi.service.component.annotations.Reference;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -58,11 +69,13 @@ import com.google.gson.GsonBuilder;
  *
  * @author David Graeff - Initial contribution
  */
-@Component(service = DiscoveryService.class, configurationPid = "discovery.mqttha")
+@Component(service = DiscoveryService.class, configurationPid = "discovery.mqttha", property = Constants.SERVICE_PID
+        + "=discovery.mqttha")
+@ConfigurableService(category = "system", label = "Home Assistant Discovery", description_uri = "binding:mqtt.homeassistant")
 @NonNullByDefault
 public class HomeAssistantDiscovery extends AbstractMQTTDiscovery {
-    @SuppressWarnings("unused")
     private final Logger logger = LoggerFactory.getLogger(HomeAssistantDiscovery.class);
+    private HomeAssistantConfiguration configuration;
     protected final Map<String, Set<HaID>> componentsPerThingID = new TreeMap<>();
     protected final Map<String, ThingUID> thingIDPerTopic = new TreeMap<>();
     protected final Map<String, DiscoveryResult> results = new ConcurrentHashMap<>();
@@ -85,6 +98,8 @@ public class HomeAssistantDiscovery extends AbstractMQTTDiscovery {
     }
 
     static final String BASE_TOPIC = "homeassistant";
+    static final String BIRTH_TOPIC = "homeassistant/status";
+    static final String ONLINE_STATUS = "online";
 
     @NonNullByDefault({})
     protected MqttChannelTypeProvider typeProvider;
@@ -92,9 +107,11 @@ public class HomeAssistantDiscovery extends AbstractMQTTDiscovery {
     @NonNullByDefault({})
     protected MQTTTopicDiscoveryService mqttTopicDiscovery;
 
-    public HomeAssistantDiscovery() {
+    @Activate
+    public HomeAssistantDiscovery(@Nullable Map<String, Object> properties) {
         super(null, 3, true, BASE_TOPIC + "/#");
         this.gson = new GsonBuilder().registerTypeAdapterFactory(new ChannelConfigurationTypeAdapterFactory()).create();
+        configuration = (new Configuration(properties)).as(HomeAssistantConfiguration.class);
     }
 
     @Reference
@@ -105,6 +122,11 @@ public class HomeAssistantDiscovery extends AbstractMQTTDiscovery {
     public void unsetMQTTTopicDiscoveryService(@Nullable MQTTTopicDiscoveryService service) {
         mqttTopicDiscovery.unsubscribe(this);
         this.mqttTopicDiscovery = null;
+    }
+
+    @Modified
+    protected void modified(@Nullable Map<String, Object> properties) {
+        configuration = (new Configuration(properties)).as(HomeAssistantConfiguration.class);
     }
 
     @Override
@@ -124,6 +146,33 @@ public class HomeAssistantDiscovery extends AbstractMQTTDiscovery {
     @Override
     public Set<ThingTypeUID> getSupportedThingTypes() {
         return typeProvider.getThingTypeUIDs();
+    }
+
+    /**
+     * Summarize components such as {Switch, Switch, Sensor} into string "Sensor, 2x Switch"
+     *
+     * @param componentNames stream of component names
+     * @return summary string of component names and their counts
+     */
+    static String getComponentNamesSummary(Stream<String> componentNames) {
+        StringBuilder summary = new StringBuilder();
+        Collector<String, ?, Long> countingCollector = Collectors.counting();
+        Map<String, Long> componentCounts = componentNames
+                .collect(Collectors.groupingBy(Function.identity(), countingCollector));
+        componentCounts.entrySet().stream().sorted(Map.Entry.comparingByKey()).forEach(entry -> {
+            String componentName = entry.getKey();
+            long count = entry.getValue();
+            if (summary.length() > 0) {
+                // not the first entry, so let's add the separating comma
+                summary.append(", ");
+            }
+            if (count > 1) {
+                summary.append(count);
+                summary.append("x ");
+            }
+            summary.append(componentName);
+        });
+        return summary.toString();
     }
 
     @Override
@@ -166,11 +215,24 @@ public class HomeAssistantDiscovery extends AbstractMQTTDiscovery {
             thingIDPerTopic.put(topic, thingUID);
 
             // We need to keep track of already found component topics for a specific thing
-            Set<HaID> components = componentsPerThingID.computeIfAbsent(thingID, key -> ConcurrentHashMap.newKeySet());
-            components.add(haID);
+            final List<HaID> components;
+            {
+                Set<HaID> componentsUnordered = componentsPerThingID.computeIfAbsent(thingID,
+                        key -> ConcurrentHashMap.newKeySet());
 
-            final String componentNames = components.stream().map(id -> id.component)
-                    .map(c -> HA_COMP_TO_NAME.getOrDefault(c, c)).collect(Collectors.joining(", "));
+                // Invariant. For compiler, computeIfAbsent above returns always
+                // non-null
+                Objects.requireNonNull(componentsUnordered);
+                componentsUnordered.add(haID);
+
+                components = componentsUnordered.stream().collect(Collectors.toList());
+                // We sort the components for consistent jsondb serialization order of 'topics' thing property
+                // Sorting key is HaID::toString, i.e. using the full topic string
+                components.sort(Comparator.comparing(HaID::toString));
+            }
+
+            final String componentNames = getComponentNamesSummary(
+                    components.stream().map(id -> id.component).map(c -> HA_COMP_TO_NAME.getOrDefault(c, c)));
 
             final List<String> topics = components.stream().map(HaID::toShortTopic).collect(Collectors.toList());
 
@@ -191,6 +253,26 @@ public class HomeAssistantDiscovery extends AbstractMQTTDiscovery {
         } catch (Exception e) {
             logger.warn("HomeAssistant discover error: {}", e.getMessage());
         }
+    }
+
+    @Override
+    protected void startScan() {
+        super.startScan();
+        triggerDeviceDiscovery();
+    }
+
+    @Override
+    protected void startBackgroundDiscovery() {
+        super.startBackgroundDiscovery();
+        triggerDeviceDiscovery();
+    }
+
+    private void triggerDeviceDiscovery() {
+        if (!configuration.status) {
+            return;
+        }
+        // https://www.home-assistant.io/integrations/mqtt/#use-the-birth-and-will-messages-to-trigger-discovery
+        getDiscoveryService().publish(BIRTH_TOPIC, ONLINE_STATUS.getBytes(), 1, false);
     }
 
     protected void publishResults() {
@@ -215,14 +297,16 @@ public class HomeAssistantDiscovery extends AbstractMQTTDiscovery {
         }
         if (thingIDPerTopic.containsKey(topic)) {
             ThingUID thingUID = thingIDPerTopic.remove(topic);
-            final String thingID = thingUID.getId();
+            if (thingUID != null) {
+                final String thingID = thingUID.getId();
 
-            HaID haID = new HaID(topic);
+                HaID haID = new HaID(topic);
 
-            Set<HaID> components = componentsPerThingID.getOrDefault(thingID, Collections.emptySet());
-            components.remove(haID);
-            if (components.isEmpty()) {
-                thingRemoved(thingUID);
+                Set<HaID> components = componentsPerThingID.getOrDefault(thingID, Collections.emptySet());
+                components.remove(haID);
+                if (components.isEmpty()) {
+                    thingRemoved(thingUID);
+                }
             }
         }
     }

@@ -10,13 +10,14 @@
 		</supported-bridge-type-refs>
 
 		<label>Relay</label>
-		<description>Relay</description>
 		<channels>
 			<channel id="relayState" typeId="system.power"/>
 		</channels>
 
 		<properties>
-			<property name="Vendor">Hayward</property>
+			<property name="vendor">Hayward</property>
+			<property name="relayType"></property>
+			<property name="relayFunction"></property>
 		</properties>
 		<representation-property>systemID</representation-property>
 

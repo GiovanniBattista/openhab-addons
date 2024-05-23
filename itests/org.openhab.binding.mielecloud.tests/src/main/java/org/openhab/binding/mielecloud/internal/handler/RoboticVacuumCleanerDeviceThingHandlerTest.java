@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2021 Contributors to the openHAB project
+ * Copyright (c) 2010-2024 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -41,12 +41,15 @@ public class RoboticVacuumCleanerDeviceThingHandlerTest extends AbstractMieleThi
     protected AbstractMieleThingHandler setUpThingHandler() {
         return createThingHandler(MieleCloudBindingConstants.THING_TYPE_ROBOTIC_VACUUM_CLEANER,
                 MieleCloudBindingIntegrationTestConstants.ROBOTIC_VACUUM_CLEANER_THING_UID,
-                RoboticVacuumCleanerDeviceThingHandler.class, MieleCloudBindingIntegrationTestConstants.SERIAL_NUMBER);
+                RoboticVacuumCleanerDeviceThingHandler.class, MieleCloudBindingIntegrationTestConstants.SERIAL_NUMBER,
+                "0");
     }
 
     @Test
-    public void testChannelUpdatesForNullValues() {
+    public void testChannelUpdatesForNullValues() throws Exception {
         // given:
+        setUpBridgeAndThing();
+
         DeviceState deviceState = mock(DeviceState.class);
         when(deviceState.getDeviceIdentifier())
                 .thenReturn(MieleCloudBindingIntegrationTestConstants.ROBOTIC_VACUUM_CLEANER_THING_UID.getId());
@@ -76,8 +79,10 @@ public class RoboticVacuumCleanerDeviceThingHandlerTest extends AbstractMieleThi
     }
 
     @Test
-    public void testChannelUpdatesForValidValues() {
+    public void testChannelUpdatesForValidValues() throws Exception {
         // given:
+        setUpBridgeAndThing();
+
         DeviceState deviceState = mock(DeviceState.class);
         when(deviceState.isInState(any())).thenCallRealMethod();
         when(deviceState.getDeviceIdentifier())
@@ -108,8 +113,10 @@ public class RoboticVacuumCleanerDeviceThingHandlerTest extends AbstractMieleThi
     }
 
     @Test
-    public void testFinishStateChannelIsSetToOnWhenProgramHasFinished() {
+    public void testFinishStateChannelIsSetToOnWhenProgramHasFinished() throws Exception {
         // given:
+        setUpBridgeAndThing();
+
         DeviceState deviceStateBefore = mock(DeviceState.class);
         when(deviceStateBefore.getDeviceIdentifier())
                 .thenReturn(MieleCloudBindingIntegrationTestConstants.ROBOTIC_VACUUM_CLEANER_THING_UID.getId());
@@ -134,8 +141,10 @@ public class RoboticVacuumCleanerDeviceThingHandlerTest extends AbstractMieleThi
     }
 
     @Test
-    public void testActionsChannelUpdatesForValidValues() {
+    public void testActionsChannelUpdatesForValidValues() throws Exception {
         // given:
+        setUpBridgeAndThing();
+
         ActionsState actionsState = mock(ActionsState.class);
         when(actionsState.getDeviceIdentifier())
                 .thenReturn(MieleCloudBindingIntegrationTestConstants.ROBOTIC_VACUUM_CLEANER_THING_UID.getId());
@@ -157,7 +166,10 @@ public class RoboticVacuumCleanerDeviceThingHandlerTest extends AbstractMieleThi
     }
 
     @Test
-    public void testHandleCommandVacuumCleanerProgramActive() {
+    public void testHandleCommandVacuumCleanerProgramActive() throws Exception {
+        // given:
+        setUpBridgeAndThing();
+
         // when:
         getThingHandler().handleCommand(channel(VACUUM_CLEANER_PROGRAM_ACTIVE), new StringType("1"));
 

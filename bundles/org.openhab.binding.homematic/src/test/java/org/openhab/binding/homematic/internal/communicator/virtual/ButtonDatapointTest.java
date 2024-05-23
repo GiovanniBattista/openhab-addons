@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2021 Contributors to the openHAB project
+ * Copyright (c) 2010-2024 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -60,7 +60,7 @@ public class ButtonDatapointTest extends JavaTest {
     }
 
     @Test
-    public void testLongPress() throws IOException, HomematicClientException {
+    public void testLongPressHm() throws IOException, HomematicClientException {
         HmDatapoint longPressDp = createPressDatapoint("PRESS_LONG", Boolean.TRUE);
         HmDatapoint buttonVirtualDatapoint = getButtonVirtualDatapoint(longPressDp);
 
@@ -70,6 +70,30 @@ public class ButtonDatapointTest extends JavaTest {
         HmDatapoint contPressDp = createPressDatapointFrom(longPressDp, "PRESS_CONT", Boolean.TRUE);
         mockEventReceiver.eventReceived(contPressDp);
         assertThat(buttonVirtualDatapoint.getValue(), is("LONG_REPEATED"));
+        assertThat(buttonVirtualDatapoint.getPreviousValue(), nullValue());
+
+        // Receiving another LONG event during the long press should be ignored
+        mockEventReceiver.eventReceived(longPressDp);
+        assertThat(buttonVirtualDatapoint.getValue(), is("LONG_REPEATED"));
+        assertThat(buttonVirtualDatapoint.getPreviousValue(), is("LONG_REPEATED"));
+
+        HmDatapoint releaseDp = createPressDatapointFrom(longPressDp, "PRESS_LONG_RELEASE", Boolean.TRUE);
+        mockEventReceiver.eventReceived(releaseDp);
+        assertThat(buttonVirtualDatapoint.getValue(), is("LONG_RELEASED"));
+    }
+
+    @Test
+    public void testLongPressHmIp() throws IOException, HomematicClientException {
+        HmDatapoint longPressDp = createPressDatapoint("PRESS_LONG_START", Boolean.TRUE);
+        HmDatapoint buttonVirtualDatapoint = getButtonVirtualDatapoint(longPressDp);
+
+        mockEventReceiver.eventReceived(longPressDp);
+        assertThat(buttonVirtualDatapoint.getValue(), is(CommonTriggerEvents.LONG_PRESSED));
+
+        HmDatapoint contPressDp = createPressDatapointFrom(longPressDp, "PRESS_LONG", Boolean.TRUE);
+        mockEventReceiver.eventReceived(contPressDp);
+        assertThat(buttonVirtualDatapoint.getValue(), is("LONG_REPEATED"));
+        assertThat(buttonVirtualDatapoint.getPreviousValue(), nullValue());
 
         HmDatapoint releaseDp = createPressDatapointFrom(longPressDp, "PRESS_LONG_RELEASE", Boolean.TRUE);
         mockEventReceiver.eventReceived(releaseDp);

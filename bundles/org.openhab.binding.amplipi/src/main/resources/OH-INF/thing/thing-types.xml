@@ -51,15 +51,26 @@
 		<description>A zone of the AmpliPi system</description>
 
 		<channels>
+			<channel typeId="system.power" id="power"/>
 			<channel typeId="system.volume" id="volume"/>
 			<channel typeId="system.mute" id="mute"/>
 			<channel typeId="source" id="source"/>
 		</channels>
 
+		<properties>
+			<property name="thingTypeVersion">1</property>
+		</properties>
+
 		<config-description>
 			<parameter name="id" type="integer" required="true">
 				<label>Zone ID</label>
 				<description>The ID of the zone</description>
+			</parameter>
+			<parameter name="volumeDelta" type="integer" min="1" max="10">
+				<label>Volume Delta</label>
+				<description>How much to change the zone volume for each INCREASE/DECREASE command (in dB)</description>
+				<default>1</default>
+				<advanced>true</advanced>
 			</parameter>
 		</config-description>
 	</thing-type>
@@ -73,15 +84,26 @@
 		<description>A group of the AmpliPi system</description>
 
 		<channels>
+			<channel typeId="system.power" id="power"/>
 			<channel typeId="system.volume" id="volume"/>
 			<channel typeId="system.mute" id="mute"/>
 			<channel typeId="source" id="source"/>
 		</channels>
 
+		<properties>
+			<property name="thingTypeVersion">1</property>
+		</properties>
+
 		<config-description>
 			<parameter name="id" type="integer" required="true">
 				<label>Group ID</label>
 				<description>The ID of the group</description>
+			</parameter>
+			<parameter name="volumeDelta" type="integer" min="1" max="10">
+				<label>Volume Delta</label>
+				<description>How much to change the group volume for each INCREASE/DECREASE command (in dB)</description>
+				<default>1</default>
+				<advanced>true</advanced>
 			</parameter>
 		</config-description>
 	</thing-type>

@@ -27,7 +27,7 @@
 		<label>Brightness</label>
 		<description>The brightness channel allows to control the brightness of a light. It is also possible to switch the
 			light on and off.</description>
-		<category>DimmableLight</category>
+		<category>Light</category>
 		<tags>
 			<tag>Control</tag>
 			<tag>Light</tag>
@@ -124,7 +124,7 @@
 	</channel-type>
 
 	<channel-type id="humidity">
-		<item-type>Number:Dimensionless</item-type>
+		<item-type unitHint="%">Number:Dimensionless</item-type>
 		<label>Humidity</label>
 		<category>Humidity</category>
 		<state pattern="%.1f %unit%" readOnly="true">

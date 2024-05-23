@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2021 Contributors to the openHAB project
+ * Copyright (c) 2010-2024 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -38,6 +38,7 @@ import org.openhab.binding.ventaair.internal.message.dto.DeviceInfoMessage;
 import org.openhab.binding.ventaair.internal.message.dto.Header;
 import org.openhab.binding.ventaair.internal.message.dto.Info;
 import org.openhab.binding.ventaair.internal.message.dto.Measurements;
+import org.openhab.core.library.dimension.Density;
 import org.openhab.core.library.types.DecimalType;
 import org.openhab.core.library.types.OnOffType;
 import org.openhab.core.library.types.QuantityType;
@@ -91,20 +92,20 @@ public class VentaThingHandler extends BaseThingHandler {
                 }
                 break;
             case VentaAirBindingConstants.CHANNEL_FAN_SPEED:
-                if (command instanceof DecimalType) {
-                    int fanStage = ((DecimalType) command).intValue();
+                if (command instanceof DecimalType decimalCommand) {
+                    int fanStage = decimalCommand.intValue();
                     dispatchActionToDevice(new FanAction(fanStage));
                 }
                 break;
             case VentaAirBindingConstants.CHANNEL_TARGET_HUMIDITY:
-                if (command instanceof DecimalType) {
-                    int targetHumidity = ((DecimalType) command).intValue();
+                if (command instanceof DecimalType decimalCommand) {
+                    int targetHumidity = decimalCommand.intValue();
                     dispatchActionToDevice(new HumidityAction(targetHumidity));
                 }
                 break;
             case VentaAirBindingConstants.CHANNEL_TIMER:
-                if (command instanceof DecimalType) {
-                    int timer = ((DecimalType) command).intValue();
+                if (command instanceof DecimalType decimalCommand) {
+                    int timer = decimalCommand.intValue();
                     dispatchActionToDevice(new TimerAction(timer));
                 }
                 break;
@@ -275,6 +276,11 @@ public class VentaThingHandler extends BaseThingHandler {
                 updateState(VentaAirBindingConstants.CHANNEL_HUMIDITY, humidityState);
                 channelValueCache.put(VentaAirBindingConstants.CHANNEL_HUMIDITY, humidityState);
 
+                QuantityType<Density> pm25State = new QuantityType<>(measurements.getDust(),
+                        Units.MICROGRAM_PER_CUBICMETRE);
+                updateState(VentaAirBindingConstants.CHANNEL_PM25, pm25State);
+                channelValueCache.put(VentaAirBindingConstants.CHANNEL_PM25, pm25State);
+
                 DecimalType waterLevelState = new DecimalType(measurements.getWaterLevel());
                 updateState(VentaAirBindingConstants.CHANNEL_WATERLEVEL, waterLevelState);
                 channelValueCache.put(VentaAirBindingConstants.CHANNEL_WATERLEVEL, waterLevelState);
@@ -290,25 +296,29 @@ public class VentaThingHandler extends BaseThingHandler {
                 int discReplaceHours = info.getDiscIonT() * 5 / 60;
                 int cleaningHours = info.getCleaningT() * 5 / 60;
 
-                QuantityType<Time> opHoursState = new QuantityType<Time>(opHours, Units.HOUR);
+                QuantityType<Time> opHoursState = new QuantityType<>(opHours, Units.HOUR);
                 updateState(VentaAirBindingConstants.CHANNEL_OPERATION_TIME, opHoursState);
                 channelValueCache.put(VentaAirBindingConstants.CHANNEL_OPERATION_TIME, opHoursState);
 
-                QuantityType<Time> discReplaceHoursState = new QuantityType<Time>(2200 - discReplaceHours, Units.HOUR);
+                QuantityType<Time> discReplaceHoursState = new QuantityType<>(2200 - discReplaceHours, Units.HOUR);
                 updateState(VentaAirBindingConstants.CHANNEL_DISC_REPLACE_TIME, discReplaceHoursState);
                 channelValueCache.put(VentaAirBindingConstants.CHANNEL_DISC_REPLACE_TIME, discReplaceHoursState);
 
-                QuantityType<Time> cleaningHoursState = new QuantityType<Time>(4400 - cleaningHours, Units.HOUR);
+                QuantityType<Time> cleaningHoursState = new QuantityType<>(4400 - cleaningHours, Units.HOUR);
                 updateState(VentaAirBindingConstants.CHANNEL_CLEANING_TIME, cleaningHoursState);
                 channelValueCache.put(VentaAirBindingConstants.CHANNEL_CLEANING_TIME, cleaningHoursState);
 
-                OnOffType cleanModeState = info.isCleanMode() ? OnOffType.ON : OnOffType.OFF;
+                OnOffType cleanModeState = OnOffType.from(info.isCleanMode());
                 updateState(VentaAirBindingConstants.CHANNEL_CLEAN_MODE, cleanModeState);
                 channelValueCache.put(VentaAirBindingConstants.CHANNEL_CLEAN_MODE, cleanModeState);
 
-                QuantityType<Time> timerTimePassedState = new QuantityType<Time>(info.getTimerT(), Units.MINUTE);
+                QuantityType<Time> timerTimePassedState = new QuantityType<>(info.getTimerT(), Units.MINUTE);
                 updateState(VentaAirBindingConstants.CHANNEL_TIMER_TIME_PASSED, timerTimePassedState);
                 channelValueCache.put(VentaAirBindingConstants.CHANNEL_TIMER_TIME_PASSED, timerTimePassedState);
+
+                QuantityType<Time> serviceTimeState = new QuantityType<>(info.getServiceT(), Units.MINUTE);
+                updateState(VentaAirBindingConstants.CHANNEL_SERVICE_TIME, serviceTimeState);
+                channelValueCache.put(VentaAirBindingConstants.CHANNEL_SERVICE_TIME, serviceTimeState);
 
                 updateProperties(info);
             }
@@ -317,10 +327,8 @@ public class VentaThingHandler extends BaseThingHandler {
         }
 
         private boolean messageIsEmpty(DeviceInfoMessage message) {
-            if (message.getCurrentActions() == null && message.getInfo() == null && message.getMeasurements() == null) {
-                return true;
-            }
-            return false;
+            return (message.getCurrentActions() == null && message.getInfo() == null
+                    && message.getMeasurements() == null);
         }
 
         /**

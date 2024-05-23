@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2021 Contributors to the openHAB project
+ * Copyright (c) 2010-2024 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -30,9 +30,12 @@ import javax.ws.rs.client.ClientBuilder;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.eclipse.jetty.client.HttpClient;
+import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.openhab.binding.remoteopenhab.internal.handler.RemoteopenhabBridgeHandler;
 import org.openhab.binding.remoteopenhab.internal.handler.RemoteopenhabThingHandler;
 import org.openhab.core.config.core.Configuration;
+import org.openhab.core.i18n.LocaleProvider;
+import org.openhab.core.i18n.TranslationProvider;
 import org.openhab.core.io.net.http.HttpClientFactory;
 import org.openhab.core.thing.Bridge;
 import org.openhab.core.thing.Thing;
@@ -77,6 +80,8 @@ public class RemoteopenhabHandlerFactory extends BaseThingHandlerFactory {
     private final RemoteopenhabStateDescriptionOptionProvider stateDescriptionProvider;
     private final RemoteopenhabCommandDescriptionOptionProvider commandDescriptionProvider;
     private final Gson jsonParser;
+    private final TranslationProvider i18nProvider;
+    private final LocaleProvider localeProvider;
 
     private HttpClient httpClientTrustingCert;
 
@@ -85,16 +90,19 @@ public class RemoteopenhabHandlerFactory extends BaseThingHandlerFactory {
             final @Reference ClientBuilder clientBuilder, final @Reference SseEventSourceFactory eventSourceFactory,
             final @Reference RemoteopenhabChannelTypeProvider channelTypeProvider,
             final @Reference RemoteopenhabStateDescriptionOptionProvider stateDescriptionProvider,
-            final @Reference RemoteopenhabCommandDescriptionOptionProvider commandDescriptionProvider) {
+            final @Reference RemoteopenhabCommandDescriptionOptionProvider commandDescriptionProvider,
+            final @Reference TranslationProvider i18nProvider, final @Reference LocaleProvider localeProvider) {
         this.httpClient = httpClientFactory.getCommonHttpClient();
-        this.httpClientTrustingCert = httpClientFactory.createHttpClient(RemoteopenhabBindingConstants.BINDING_ID);
         this.clientBuilder = clientBuilder;
         this.eventSourceFactory = eventSourceFactory;
         this.channelTypeProvider = channelTypeProvider;
         this.stateDescriptionProvider = stateDescriptionProvider;
         this.commandDescriptionProvider = commandDescriptionProvider;
         this.jsonParser = new GsonBuilder().setFieldNamingPolicy(FieldNamingPolicy.IDENTITY).create();
+        this.i18nProvider = i18nProvider;
+        this.localeProvider = localeProvider;
 
+        SslContextFactory sslContextFactory = new SslContextFactory.Client();
         try {
             SSLContext sslContext = SSLContext.getInstance("SSL");
 
@@ -135,14 +143,15 @@ public class RemoteopenhabHandlerFactory extends BaseThingHandlerFactory {
                 }
             } };
             sslContext.init(null, trustAllCerts, null);
-
-            this.httpClientTrustingCert.getSslContextFactory().setSslContext(sslContext);
+            sslContextFactory.setSslContext(sslContext);
         } catch (NoSuchAlgorithmException e) {
             logger.warn("An exception occurred while requesting the SSL encryption algorithm : '{}'", e.getMessage(),
                     e);
         } catch (KeyManagementException e) {
             logger.warn("An exception occurred while initialising the SSL context : '{}'", e.getMessage(), e);
         }
+        this.httpClientTrustingCert = httpClientFactory.createHttpClient(RemoteopenhabBindingConstants.BINDING_ID,
+                sslContextFactory);
     }
 
     @Override
@@ -200,7 +209,7 @@ public class RemoteopenhabHandlerFactory extends BaseThingHandlerFactory {
         if (thingTypeUID.equals(RemoteopenhabBindingConstants.BRIDGE_TYPE_SERVER)) {
             return new RemoteopenhabBridgeHandler((Bridge) thing, httpClient, httpClientTrustingCert, clientBuilder,
                     eventSourceFactory, channelTypeProvider, stateDescriptionProvider, commandDescriptionProvider,
-                    jsonParser);
+                    jsonParser, i18nProvider, localeProvider);
         } else if (RemoteopenhabBindingConstants.SUPPORTED_THING_TYPES_UIDS.contains(thingTypeUID)) {
             return new RemoteopenhabThingHandler(thing);
         }

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2021 Contributors to the openHAB project
+ * Copyright (c) 2010-2024 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -230,8 +230,8 @@ public class DeviceStatusManagerImpl implements DeviceStatusManager {
     /**
      * Check and updates the {@link Device} structure, configurations and status.
      *
-     * @author Michael Ochel - initial contributer
-     * @author Matthias Siegele - initial contributer
+     * @author Michael Ochel - Initial contribution
+     * @author Matthias Siegele - Initial contribution
      */
     private class PollingRunnable implements Runnable {
         private boolean devicesLoaded = false;
@@ -340,7 +340,7 @@ public class DeviceStatusManagerImpl implements DeviceStatusManager {
                         }
                     }
                     if (deviceDiscovery != null) {
-                        // only informs discovery, if the device is a output or a sensor device
+                        // only informs discovery, if the device is an output or a sensor device
                         deviceDiscovery.onDeviceAdded(currentDevice);
                         logger.debug("inform DeviceStatusListener: {} about added device with dSID {}",
                                 DeviceStatusListener.DEVICE_DISCOVERY, currentDevice.getDSID().getValue());
@@ -610,9 +610,7 @@ public class DeviceStatusManagerImpl implements DeviceStatusManager {
 
         @Override
         public boolean equals(Object object) {
-            return object instanceof TrashDevice
-                    ? this.device.getDSID().equals(((TrashDevice) object).getDevice().getDSID())
-                    : false;
+            return object instanceof TrashDevice td ? this.device.getDSID().equals(td.getDevice().getDSID()) : false;
         }
     }
 
@@ -1189,6 +1187,8 @@ public class DeviceStatusManagerImpl implements DeviceStatusManager {
                 tempConsumption += value.getValue();
                 if (strucMan.getCircuitByDSID(value.getDsid()) != null) {
                     strucMan.getCircuitByDSID(value.getDsid()).addMeteringValue(value);
+                } else if (strucMan.getCircuitByDSUID(value.getDsuid()) != null) {
+                    strucMan.getCircuitByDSUID(value.getDsuid()).addMeteringValue(value);
                 }
             }
         }
@@ -1216,6 +1216,8 @@ public class DeviceStatusManagerImpl implements DeviceStatusManager {
                 tempEnergyMeter += value.getValue();
                 if (strucMan.getCircuitByDSID(value.getDsid()) != null) {
                     strucMan.getCircuitByDSID(value.getDsid()).addMeteringValue(value);
+                } else if (strucMan.getCircuitByDSUID(value.getDsuid()) != null) {
+                    strucMan.getCircuitByDSUID(value.getDsuid()).addMeteringValue(value);
                 }
             }
         }
@@ -1232,6 +1234,8 @@ public class DeviceStatusManagerImpl implements DeviceStatusManager {
                 tempEnergyMeterWs += value.getValue();
                 if (strucMan.getCircuitByDSID(value.getDsid()) != null) {
                     strucMan.getCircuitByDSID(value.getDsid()).addMeteringValue(value);
+                } else if (strucMan.getCircuitByDSUID(value.getDsuid()) != null) {
+                    strucMan.getCircuitByDSUID(value.getDsuid()).addMeteringValue(value);
                 }
             }
         }

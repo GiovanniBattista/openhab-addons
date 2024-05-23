@@ -1,44 +1,29 @@
 # Kaleidescape Binding
 
-![Kaleidescape logo](doc/Kaleidescape_Logo.png)
-
-This binding is used to control and retrieve information from a Kaleidescape movie player.
-All movie player components including the original K-Player series, M Class Players, Cinema One, Alto, and Strato are supported.
-The 4 zone audio only KMUSIC-4000 is not supported at this time.
-As there are many good control options already available for these components, this binding focuses primarily on retrieving information
- for display purposes and to use in rules for controlling other Things such lighting, projector lens control, masking, etc.
-Basic playback transport controls are provided and any other command that is supported by the control protocol can be sent to the component through rules based commands.
+This binding now makes it possible to easily integrate almost all of the capabilities of the Kaleidescape control protocol into openHAB.
+Beyond just integrating playback transport controls, all meta-data provided via the control protocol is made available for display purposes and to use in rules.
+By using rules, it is possible to control other Things such as lighting, projector lens shift, screen masking, etc. based on events that occur during movie playback.
+A simulated remote control is available in BasicUI using the Buttongrid sitemap element described below.
+Finally, any other command that is supported by the control protocol can be sent to the component through rules.
 See [Kaleidescape-System-Control-Protocol-Reference-Manual.pdf](https://support.kaleidescape.com/article/Control-Protocol-Reference-Manual) for a reference of available commands.
-To simplify the design of the binding code, a different Thing instance is created for each component
- in a multi-zone system and each Thing maintains its own socket connection to the target component.
-Overall this binding supports the majority of information and commands available in the Kaleidescape control protocol but is by no means exhaustive.
-Any feedback or suggestions for improvement are welcome.
-
-The binding supports two different kinds of connections:
-
-* direct IP connection (preferred),
-* serial connection (19200-8-N-1)
 
 ## Supported Things
 
-There are four supported thing types, which represent the different models of Kaleidescape components.
+All movie player components including the original K-Player series, M Class Players, Cinema One, Alto, and Strato are supported.
 It is important to choose the correct thing type to ensure the available channels are correct for the component being used.  
 
 The supported thing types are:  
 `player` Any KPlayer, M Class [M300, M500, M700] or Cinema One 1st Gen player  
 `cinemaone` Cinema One (2nd Gen)  
 `alto`  
-`strato` Includes Strato, Strato S, or Strato C   
+`strato` Includes Strato, Strato S, or Strato C  
+
+The binding supports either a TCP/IP connection or direct serial port connection (19200-8-N-1) to the Kaleidescape component.  
 
 ## Discovery
 
-Manually initiated Auto-discovery will locate all suported Kaleidescape components if they are on the same IP subnet of the openHAB server.
-In the Inbox, select Search For Things and then choose the Kaleidescape System Binding to initiate a discovery scan.
-
-## Binding Configuration
-
-There are no overall binding configuration settings that need to be set.
-All settings are through thing configuration parameters.
+Manually initiated Auto-discovery will locate all supported Kaleidescape components if they are on the same IP subnet of the openHAB server.
+In the Inbox, select Search For Things and then choose the Kaleidescape Binding to initiate a discovery scan.
 
 ## Thing Configuration
 
@@ -57,17 +42,17 @@ The thing has the following configuration parameters:
 
 Some notes:
 
-* Due to a bug in the control protocol, a Strato C player will be identified as a Premiere 'Player' by the auto discovery process.
-* The only caveat of note about this binding is the updatePeriod configuration parameter.
-* When set to the default of 0, the component only sends running time update messages sporadically (as an example: when the movie chapter changes) while content is playing.
-* In this case, the running time channels will also only sporadically update.
-* When updatePeriod is set to 1 (values greater than 1 are not yet supported by the control protocol), the component sends running time status update messages every second.
-* Be aware that this could cause performance impacts to your openHAB system.
+- Due to a bug in the control protocol, a Strato C player will be identified as a Premiere 'Player' by the auto discovery process.
+- The only caveat of note about this binding is the updatePeriod configuration parameter.
+- When set to the default of 0, the component only sends running time update messages sporadically (as an example: when the movie chapter changes) while content is playing.
+- In this case, the running time channels will also only sporadically update.
+- When updatePeriod is set to 1 (values greater than 1 are not yet supported by the control protocol), the component sends running time status update messages every second.
+- Be aware that this could cause performance impacts to your openHAB system.
 
-* On Linux, you may get an error stating the serial port cannot be opened when the Kaleidescape binding tries to load.
-* You can get around this by adding the `openhab` user to the `dialout` group like this: `usermod -a -G dialout openhab`.
-* Also on Linux you may have issues with the USB if using two serial USB devices e.g. Kaleidescape and RFXcom.
-* See the [general documentation about serial port configuration](/docs/administration/serial.html) for more on symlinking the USB ports.
+- On Linux, you may get an error stating the serial port cannot be opened when the Kaleidescape binding tries to load.
+- You can get around this by adding the `openhab` user to the `dialout` group like this: `usermod -a -G dialout openhab`.
+- Also on Linux you may have issues with the USB if using two serial USB devices e.g. Kaleidescape and RFXcom.
+- See the [general documentation about serial port configuration](/docs/administration/serial.html) for more on symlinking the USB ports.
 
 ## Channels
 
@@ -78,7 +63,7 @@ The following channels are available:
 | ui#power                   | Switch      | Turn the zone On or Off (system standby)                                                                         |
 | ui#volume                  | Dimmer      | A virtual volume that tracks the volume in K control apps, use as a proxy to adjust a real volume item via rules |
 | ui#mute                    | Switch      | A virtual mute switch that tracks the mute status in K control apps, use as a proxy to control a real mute item  |
-| ui#control                 | Player      | Control Movie Playback e.g. start/pause/next/previous/ffward/rewind                                              |
+| ui#control                 | Player      | Control Movie Playback e.g. play/pause/next/previous/ffward/rewind                                               |
 | ui#title_name              | String      | The title of the movie currently playing                                                                         |
 | ui#play_mode               | String      | The current playback mode of the movie                                                                           |
 | ui#play_speed              | String      | The speed of playback scanning                                                                                   |
@@ -111,8 +96,9 @@ The following channels are available:
 | ui#user_defined_event      | String      | Will contain custom event messages generated by scripts, sent from another component, or system events           |
 | ui#user_input              | String      | Indicates if the user is being prompted for input, what type of input, and any currently entered characters      |
 | ui#user_input_prompt       | String      | Indicates user input prompt info and properties currently shown on screen                                        |
+| ui#sendcmd                 | String      | Sends a raw command to the Kaleidescape player (WriteOnly)                                                       |
 | -- music channels (not available on Alto and Strato) --                                                                                                     |
-| music#control              | Player      | Control Music Playback e.g. start/pause/next/previous/ffward/rewind                                              |
+| music#control              | Player      | Control Music Playback e.g. play/pause/next/previous/ffward/rewind                                               |
 | music#repeat               | Switch      | Controls repeat playback for music                                                                               |
 | music#random               | Switch      | Controls random playback for music                                                                               |
 | music#track                | String      | The name of the currently playing track                                                                          |
@@ -148,21 +134,19 @@ The following channels are available:
 | detail#aspect_ratio        | String      | The aspect ratio of the selected movie                                                                           |
 | detail#disc_location       | String      | Indicates where the disc for the selected item is currently residing in the system (ie Vault, Tray, etc.)        |
 
-
 ## Full Example
 
 kaleidescape.things:
 
-```
+```java
 kaleidescape:player:myzone1 "M500 Living Rm" [ host="192.168.1.10", updatePeriod=0, loadHighlightedDetails=true, loadAlbumDetails=true ]
 kaleidescape:cinemaone:myzone2 "My Cinema One" [ host="192.168.1.11", updatePeriod=0, loadHighlightedDetails=true, loadAlbumDetails=true ]
 kaleidescape:strato:myzone3 "Strato Theater Rm" [ host="192.168.1.12", updatePeriod=0, loadHighlightedDetails=true ]
-
 ```
 
 kaleidescape.items:
 
-```
+```java
 // Virtual switch to send a command, see sitemap and rules below
 Switch z1_GoMovieCovers   "Go to Movie Covers"
 
@@ -204,6 +188,7 @@ String z1_Ui_HighlightedSelection "Highlighted Selection: [%s]" { channel="kalei
 String z1_Ui_UserDefinedEvent "User Defined Event: [%s]" { channel="kaleidescape:player:myzone1:ui#user_defined_event" }
 String z1_Ui_UserInput "User Input: [%s]" { channel="kaleidescape:player:myzone1:ui#user_input" }
 String z1_Ui_UserInputPrompt "User Input Prompt[%s]" { channel="kaleidescape:player:myzone1:ui#user_input_prompt" }
+String z1_Ui_Sendcmd "Send Command" { channel="kaleidescape:player:myzone1:ui#sendcmd" }
 
 // Music Channels (not available on Alto or Strato)
 Player z1_Music_Control "Music Control" { channel="kaleidescape:player:myzone1:music#control" }
@@ -242,13 +227,15 @@ String z1_Detail_ColorDescription "Color Description: [%s]" { channel="kaleidesc
 String z1_Detail_Country "Country: [%s]" { channel="kaleidescape:player:myzone1:detail#country" }
 String z1_Detail_AspectRatio "Aspect Ratio: [%s]" { channel="kaleidescape:player:myzone1:detail#aspect_ratio" }
 String z1_Detail_DiscLocation "Disc Location: [%s]" { channel="kaleidescape:player:myzone1:detail#disc_location" }
-
+String z1_MovieSearch "Movie Search"
 ```
 
 ksecondsformat.js:
 
-```
-(function(totalSeconds) {
+```javascript
+(function(timestamp) {
+    var totalSeconds = Date.parse(timestamp) / 1000
+
     if (isNaN(totalSeconds)) {
         return '-';
     } else {
@@ -269,7 +256,7 @@ ksecondsformat.js:
 
 kaleidescape.sitemap:
 
-```
+```perl
 sitemap kaleidescape label="Kaleidescape" {
     Frame label="Zone 1" {
         Image item=z1_Detail_CoverArt
@@ -289,6 +276,7 @@ sitemap kaleidescape label="Kaleidescape" {
         Text item=z1_Detail_Country visibility=[z1_Detail_Type=="movie"] icon="none"
         Text item=z1_Detail_AspectRatio visibility=[z1_Detail_Type=="movie"] icon="none"
         Text item=z1_Detail_DiscLocation visibility=[z1_Detail_Type=="movie", z1_Detail_Type=="album"] icon="player"
+        Input item=z1_MovieSearch label="Movie Search" staticIcon=zoom inputHint="text"
 
         Text label="Now Playing - Movie" icon="screen" {
             Switch item=z1_Ui_Power
@@ -349,13 +337,14 @@ sitemap kaleidescape label="Kaleidescape" {
             Text item=z1_Music_AlbumHandle icon="zoom"
             Text item=z1_Music_NowplayHandle icon="zoom"
         }
+        Buttongrid label="Kaleidescape Remote" staticIcon=material:tv_remote item=z1_Ui_Sendcmd buttons=[1:1:DETAILS="Info", 1:2:STOP="Stop"=f7:stop, 1:3:PAUSE="Pause"=f7:pause, 2:1:PREVIOUS="Previous"=f7:backward_end_alt, 2:2:PLAY="Play"=f7:play, 2:3:NEXT="Next"=f7:forward_end_alt, 3:1:SCAN_REVERSE="Reverse"=f7:backward, 3:2:KALEIDESCAPE_MENU_TOGGLE="Menu", 3:3:SCAN_FORWARD="Forward"=f7:forward, 4:1:GO_MOVIES="Movies"=f7:film, 4:3:GO_MUSIC="Music"=f7:music_note_2, 4:2:UP="Up"=f7:arrowtriangle_up, 6:2:DOWN="Down"=f7:arrowtriangle_down, 5:1:LEFT="Left"=f7:arrowtriangle_left, 5:3:RIGHT="Right"=f7:arrowtriangle_right, 5:2:SELECT="OK", 7:1:DISC_MENU="Disc Menu", 7:2:INTERMISSION_TOGGLE="Intermission", 7:3:PAGE_UP="Page Up", 8:1:SHUFFLE_COVER_ART="Shuffle", 8:2:GO_NOW_PLAYING="Now Playing", 8:3:PAGE_DOWN="Page Down", 9:1:"KEYBOARD_CHARACTER:1"="1", 9:2:"KEYBOARD_CHARACTER:2"="2", 9:3:"KEYBOARD_CHARACTER:3"="3", 10:1:"KEYBOARD_CHARACTER:4"="4", 10:2:"KEYBOARD_CHARACTER:5"="5", 10:3:"KEYBOARD_CHARACTER:6"="6", 11:1:"KEYBOARD_CHARACTER:7"="7", 11:2:"KEYBOARD_CHARACTER:8"="8", 11:3:"KEYBOARD_CHARACTER:9"="9", 12:1:CANCEL="Cancel", 12:2:"KEYBOARD_CHARACTER:0"="0", 12:3:SELECT="Enter", 13:1:RED="Red", 13:2:GREEN="Green", 13:3:BLUE="Blue", 14:2:YELLOW="Yellow"]
     }
 }
 ```
 
 kaleidescape.rules:
 
-```
+```java
 var int lightPercent
 val kactions = getActions("kaleidescape","kaleidescape:player:myzone1")
 
@@ -446,5 +435,27 @@ then
       return
     }
     kactions.sendKCommand("GET_CONTENT_DETAILS:" + z1_Music_AlbumHandle.state.toString + ":")
+end
+
+rule "Movie Search"
+when
+    Item z1_MovieSearch received update
+then
+    if (newState != NULL && newState.toString.length > 0) {
+        kactions.sendKCommand("GO_MOVIE_LIST")
+        Thread::sleep(1000)
+        kactions.sendKCommand("FILTER_LIST")
+        Thread::sleep(300)
+
+        var i = 0
+        var srch = newState.toString.toUpperCase
+        logInfo("kaleidescape.search","Searching for: " + srch)
+
+        while (i < (srch.length)) {
+            kactions.sendKCommand("KEYBOARD_CHARACTER:" + srch.charAt(i).toString)
+            Thread::sleep(100)
+            i++
+        }
+    }
 end
 ```

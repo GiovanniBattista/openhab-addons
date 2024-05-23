@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2021 Contributors to the openHAB project
+ * Copyright (c) 2010-2024 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -79,9 +79,7 @@ public class OpenAPIUtils {
         }
 
         try {
-            URI requestURI = new URI(HttpScheme.HTTP.asString(), (String) null, address, port, path, query,
-                    (String) null);
-            return requestURI;
+            return new URI(HttpScheme.HTTP.asString(), (String) null, address, port, path, query, (String) null);
         } catch (URISyntaxException var8) {
             LOGGER.warn("URI could not be parsed with path {}", path);
             throw new NanoleafException("Wrong URI format for API request");
@@ -115,15 +113,15 @@ public class OpenAPIUtils {
             }
         } catch (ExecutionException ee) {
             Throwable cause = ee.getCause();
-            if (cause != null && cause instanceof HttpResponseException
-                    && ((HttpResponseException) cause).getResponse().getStatus() == HttpStatus.UNAUTHORIZED_401) {
-                LOGGER.warn("OpenAPI request unauthorized. Invalid authorization token.");
+            if (cause instanceof HttpResponseException httpResponseException
+                    && httpResponseException.getResponse().getStatus() == HttpStatus.UNAUTHORIZED_401) {
+                LOGGER.debug("OpenAPI request unauthorized. Invalid authorization token.");
                 throw new NanoleafUnauthorizedException("Invalid authorization token");
             } else {
                 throw new NanoleafException("Failed to send OpenAPI request (final)", ee);
             }
         } catch (TimeoutException te) {
-            LOGGER.warn("OpenAPI request failed with timeout", te);
+            LOGGER.debug("OpenAPI request failed with timeout", te);
             throw new NanoleafException("Failed to send OpenAPI request: Timeout", te);
         } catch (InterruptedException ie) {
             throw new NanoleafInterruptedException("OpenAPI request has been interrupted", ie);
@@ -154,11 +152,7 @@ public class OpenAPIUtils {
 
             for (int i = 0; i < currentVer.length; ++i) {
                 if (currentVer[i] != requiredVer[i]) {
-                    if (currentVer[i] > requiredVer[i]) {
-                        return true;
-                    }
-
-                    return false;
+                    return (currentVer[i] > requiredVer[i]);
                 }
             }
 

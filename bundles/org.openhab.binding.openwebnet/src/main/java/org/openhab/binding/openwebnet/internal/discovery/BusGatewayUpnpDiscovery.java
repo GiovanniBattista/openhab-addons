@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2021 Contributors to the openHAB project
+ * Copyright (c) 2010-2024 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -13,7 +13,6 @@
 package org.openhab.binding.openwebnet.internal.discovery;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
@@ -145,15 +144,15 @@ public class BusGatewayUpnpDiscovery implements UpnpDiscoveryParticipant {
 
     @Override
     public Set<ThingTypeUID> getSupportedThingTypeUIDs() {
-        return Collections.singleton(OpenWebNetBindingConstants.THING_TYPE_BUS_GATEWAY);
+        return Set.of(OpenWebNetBindingConstants.THING_TYPE_BUS_GATEWAY);
     }
 
     @Override
     public @Nullable DiscoveryResult createResult(RemoteDevice device) {
-        logger.info("Found device {}", device.getType());
+        logger.debug("Found device {}", device.getType());
         DeviceInfo devInfo = new DeviceInfo(device);
         if (!devInfo.manufacturer.matches("<unknown>")) {
-            logger.info("                              |- {} ({})", devInfo.modelName, devInfo.manufacturer);
+            logger.debug("                              |- {} ({})", devInfo.modelName, devInfo.manufacturer);
         }
         ThingUID thingId = generateThingUID(devInfo);
         if (thingId != null) {
@@ -226,7 +225,7 @@ public class BusGatewayUpnpDiscovery implements UpnpDiscoveryParticipant {
                     }
                 }
             }
-            logger.info("Found BTicino device: not a OpenWebNet gateway or is not supported (UDN={})", idString);
+            logger.info("Found BTicino device: not an OpenWebNet gateway or not supported (UDN={})", idString);
         }
         return null;
     }

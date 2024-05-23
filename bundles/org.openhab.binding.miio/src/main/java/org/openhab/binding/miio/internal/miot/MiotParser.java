@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2021 Contributors to the openHAB project
+ * Copyright (c) 2010-2024 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -10,7 +10,6 @@
  *
  * SPDX-License-Identifier: EPL-2.0
  */
-
 package org.openhab.binding.miio.internal.miot;
 
 import java.io.FileNotFoundException;
@@ -63,7 +62,7 @@ import com.google.gson.JsonParser;
 public class MiotParser {
     private final Logger logger = LoggerFactory.getLogger(MiotParser.class);
 
-    private static final String BASEURL = "http://miot-spec.org/miot-spec-v2/";
+    private static final String BASEURL = "https://miot-spec.org/miot-spec-v2/";
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final boolean SKIP_SIID_1 = true;
 
@@ -97,7 +96,7 @@ public class MiotParser {
      * @param device
      * @return
      */
-    static public String toJson(MiIoBasicDevice device) {
+    public static String toJson(MiIoBasicDevice device) {
         String usersJson = GSON.toJson(device);
         usersJson = usersJson.replace(".0,\n", ",\n");
         usersJson = usersJson.replace("\n", "\r\n").replace("  ", "\t");
@@ -241,7 +240,7 @@ public class MiotParser {
                         }
                         miIoBasicChannel.setRefresh(property.access.contains("read"));
                         // add option values
-                        if (property.valueList != null && property.valueList.size() > 0) {
+                        if (property.valueList != null && !property.valueList.isEmpty()) {
                             StateDescriptionDTO stateDescription = miIoBasicChannel.getStateDescription();
                             if (stateDescription == null) {
                                 stateDescription = new StateDescriptionDTO();
@@ -328,11 +327,6 @@ public class MiotParser {
         }
         deviceMapping.setChannels(miIoBasicChannels);
         device.setDevice(deviceMapping);
-        if (actionText.length() > 35) {
-            deviceMapping.setReadmeComment(
-                    "Identified " + actionText.toString().replace("Manual", "manual").replace("\r\n", "<br />")
-                            + "Please test and feedback if they are working to they can be linked to a channel.");
-        }
         logger.info(channelConfigText.toString());
         if (actionText.length() > 30) {
             logger.info("{}", actionText);
@@ -421,6 +415,9 @@ public class MiotParser {
                     .send();
             JsonElement json = JsonParser.parseString(response.getContentAsString());
             UrnsDTO data = GSON.fromJson(json, UrnsDTO.class);
+            if (data == null) {
+                return null;
+            }
             for (ModelUrnsDTO device : data.getInstances()) {
                 if (device.getModel().contentEquals(model)) {
                     this.urn = device.getType();
@@ -432,7 +429,6 @@ public class MiotParser {
         } catch (JsonParseException e) {
             logger.debug("Failed parsing downloading models: {}", e.getMessage());
         }
-
         return null;
     }
 

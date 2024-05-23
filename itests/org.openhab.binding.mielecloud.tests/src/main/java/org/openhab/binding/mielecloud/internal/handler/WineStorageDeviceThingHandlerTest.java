@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2021 Contributors to the openHAB project
+ * Copyright (c) 2010-2024 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -43,12 +43,14 @@ public class WineStorageDeviceThingHandlerTest extends AbstractMieleThingHandler
     @Override
     protected AbstractMieleThingHandler setUpThingHandler() {
         return createThingHandler(MieleCloudBindingConstants.THING_TYPE_WINE_STORAGE, WINE_STORAGE_DEVICE_THING_UID,
-                WineStorageDeviceThingHandler.class, MieleCloudBindingIntegrationTestConstants.SERIAL_NUMBER);
+                WineStorageDeviceThingHandler.class, MieleCloudBindingIntegrationTestConstants.SERIAL_NUMBER, "0");
     }
 
     @Test
-    public void testChannelUpdatesForNullValues() {
+    public void testChannelUpdatesForNullValues() throws Exception {
         // given:
+        setUpBridgeAndThing();
+
         DeviceState deviceState = mock(DeviceState.class);
         when(deviceState.getDeviceIdentifier()).thenReturn(WINE_STORAGE_DEVICE_THING_UID.getId());
         when(deviceState.getRawType()).thenReturn(DeviceType.WINE_CONDITIONING_UNIT);
@@ -83,8 +85,10 @@ public class WineStorageDeviceThingHandlerTest extends AbstractMieleThingHandler
     }
 
     @Test
-    public void testChannelUpdatesForValidValues() {
+    public void testChannelUpdatesForValidValues() throws Exception {
         // given:
+        setUpBridgeAndThing();
+
         DeviceState deviceState = mock(DeviceState.class);
         when(deviceState.getDeviceIdentifier()).thenReturn(WINE_STORAGE_DEVICE_THING_UID.getId());
         when(deviceState.getRawType()).thenReturn(DeviceType.WINE_CONDITIONING_UNIT);
@@ -123,8 +127,10 @@ public class WineStorageDeviceThingHandlerTest extends AbstractMieleThingHandler
     }
 
     @Test
-    public void testActionsChannelUpdatesForValidValues() {
+    public void testActionsChannelUpdatesForValidValues() throws Exception {
         // given:
+        setUpBridgeAndThing();
+
         ActionsState actionsState = mock(ActionsState.class);
         when(actionsState.getDeviceIdentifier()).thenReturn(WINE_STORAGE_DEVICE_THING_UID.getId());
         when(actionsState.canBeSwitchedOn()).thenReturn(true);

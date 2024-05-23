@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2021 Contributors to the openHAB project
+ * Copyright (c) 2010-2024 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -40,6 +40,8 @@ public class Fan extends AbstractComponent<Fan.ChannelConfiguration> {
 
         @SerializedName("state_topic")
         protected @Nullable String stateTopic;
+        @SerializedName("command_template")
+        protected @Nullable String commandTemplate;
         @SerializedName("command_topic")
         protected String commandTopic = "";
         @SerializedName("payload_on")
@@ -52,11 +54,10 @@ public class Fan extends AbstractComponent<Fan.ChannelConfiguration> {
         super(componentConfiguration, ChannelConfiguration.class);
 
         OnOffValue value = new OnOffValue(channelConfiguration.payloadOn, channelConfiguration.payloadOff);
-        buildChannel(SWITCH_CHANNEL_ID, value, channelConfiguration.getName(),
-                componentConfiguration.getUpdateListener())
-                        .stateTopic(channelConfiguration.stateTopic, channelConfiguration.getValueTemplate())
-                        .commandTopic(channelConfiguration.commandTopic, channelConfiguration.isRetain(),
-                                channelConfiguration.getQos())
-                        .build();
+        buildChannel(SWITCH_CHANNEL_ID, value, getName(), componentConfiguration.getUpdateListener())
+                .stateTopic(channelConfiguration.stateTopic, channelConfiguration.getValueTemplate())
+                .commandTopic(channelConfiguration.commandTopic, channelConfiguration.isRetain(),
+                        channelConfiguration.getQos(), channelConfiguration.commandTemplate)
+                .build();
     }
 }

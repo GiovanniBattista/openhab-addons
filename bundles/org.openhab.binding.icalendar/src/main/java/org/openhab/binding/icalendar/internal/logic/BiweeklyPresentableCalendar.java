@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2021 Contributors to the openHAB project
+ * Copyright (c) 2010-2024 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -64,6 +64,7 @@ import biweekly.util.com.google.ical.compat.javautil.DateIterator;
  */
 @NonNullByDefault
 class BiweeklyPresentableCalendar extends AbstractPresentableCalendar {
+    private static final Duration ONE_DAY = Duration.ofDays(1).minusNanos(1);
     private final ICalendar usedCalendar;
 
     BiweeklyPresentableCalendar(InputStream streamed) throws IOException, CalendarException {
@@ -100,9 +101,9 @@ class BiweeklyPresentableCalendar extends AbstractPresentableCalendar {
 
     @Override
     public @Nullable Event getNextEvent(Instant instant) {
-        final Collection<VEventWPeriod> candidates = new ArrayList<VEventWPeriod>();
-        final Collection<VEvent> negativeEvents = new ArrayList<VEvent>();
-        final Collection<VEvent> positiveEvents = new ArrayList<VEvent>();
+        final Collection<VEventWPeriod> candidates = new ArrayList<>();
+        final Collection<VEvent> negativeEvents = new ArrayList<>();
+        final Collection<VEvent> positiveEvents = new ArrayList<>();
         classifyEvents(positiveEvents, negativeEvents);
         for (final VEvent currentEvent : positiveEvents) {
             final DateIterator startDates = this.getRecurredEventDateIterator(currentEvent);
@@ -297,8 +298,8 @@ class BiweeklyPresentableCalendar extends AbstractPresentableCalendar {
      * @return A VEventWPeriod describing the event or null if there is none.
      */
     private @Nullable VEventWPeriod getCurrentComponentWPeriod(Instant instant) {
-        final List<VEvent> negativeEvents = new ArrayList<VEvent>();
-        final List<VEvent> positiveEvents = new ArrayList<VEvent>();
+        final List<VEvent> negativeEvents = new ArrayList<>();
+        final List<VEvent> positiveEvents = new ArrayList<>();
         classifyEvents(positiveEvents, negativeEvents);
 
         VEventWPeriod earliestEndingEvent = null;
@@ -343,11 +344,14 @@ class BiweeklyPresentableCalendar extends AbstractPresentableCalendar {
             return Duration.ofMillis(eventDuration.toMillis());
         }
         final DateStart start = vEvent.getDateStart();
-        final DateEnd end = vEvent.getDateEnd();
-        if (start == null || end == null) {
+        if (start == null) {
             return null;
         }
-        return Duration.between(start.getValue().toInstant(), end.getValue().toInstant());
+        final DateEnd end = vEvent.getDateEnd();
+        if (end != null) {
+            return Duration.between(start.getValue().toInstant(), end.getValue().toInstant());
+        }
+        return start.getValue().hasTime() ? Duration.ZERO : ONE_DAY;
     }
 
     /**
@@ -371,7 +375,7 @@ class BiweeklyPresentableCalendar extends AbstractPresentableCalendar {
     }
 
     /**
-     * Checks whether an counter event blocks an event with given uid and start.
+     * Checks whether a counter event blocks an event with given uid and start.
      *
      * @param startInstant The start of the event.
      * @param eventUid The uid of the event.

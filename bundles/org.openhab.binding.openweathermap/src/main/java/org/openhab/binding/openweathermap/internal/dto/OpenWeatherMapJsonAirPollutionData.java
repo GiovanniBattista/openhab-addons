@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2021 Contributors to the openHAB project
+ * Copyright (c) 2010-2024 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -12,15 +12,16 @@
  */
 package org.openhab.binding.openweathermap.internal.dto;
 
+import org.openhab.binding.openweathermap.internal.dto.airpollution.List;
 import org.openhab.binding.openweathermap.internal.dto.base.Coord;
 
 /**
- * The {@link OpenWeatherMapJsonAirPollutionData} is the Java class used to map the JSON response to an OpenWeatherMap
- * request.
+ * Holds the data from the deserialised JSON response of the <a href="https://openweathermap.org/api/air-pollution">Air
+ * Pollution API</a>.
  *
  * @author Christoph Weitkamp - Initial contribution
  */
 public class OpenWeatherMapJsonAirPollutionData {
     public Coord coord;
-    public java.util.List<org.openhab.binding.openweathermap.internal.dto.airpollution.List> list;
+    public java.util.List<List> list;
 }

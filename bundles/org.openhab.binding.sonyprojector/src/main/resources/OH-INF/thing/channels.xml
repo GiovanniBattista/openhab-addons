@@ -10,7 +10,6 @@
 		<description>Current detailed power state of the projector</description>
 		<tags>
 			<tag>Status</tag>
-			<tag>Power</tag>
 		</tags>
 		<state readOnly="true">
 			<options>
@@ -200,6 +199,12 @@
 		<label>Lamp Use Time</label>
 		<description>Indicate how long the lamp has been turned on in hours</description>
 		<state readOnly="true" pattern="%d h"></state>
+	</channel-type>
+
+	<channel-type id="ircommand" advanced="true">
+		<item-type>String</item-type>
+		<label>IR Command</label>
+		<description>Send an infrared remote command</description>
 	</channel-type>
 
 </thing:thing-descriptions>

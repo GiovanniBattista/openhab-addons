@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2021 Contributors to the openHAB project
+ * Copyright (c) 2010-2024 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -32,6 +32,7 @@ import org.openhab.binding.nuki.internal.dataexchange.NukiBaseResponse;
 import org.openhab.binding.nuki.internal.dataexchange.NukiHttpClient;
 import org.openhab.binding.nuki.internal.dto.BridgeApiDeviceStateDto;
 import org.openhab.binding.nuki.internal.dto.BridgeApiListDeviceDto;
+import org.openhab.core.config.core.Configuration;
 import org.openhab.core.library.types.DateTimeType;
 import org.openhab.core.library.types.DecimalType;
 import org.openhab.core.library.types.OnOffType;
@@ -62,13 +63,21 @@ public abstract class AbstractNukiDeviceHandler<T extends NukiDeviceConfiguratio
 
     protected final Logger logger = LoggerFactory.getLogger(getClass());
     private static final int JOB_INTERVAL = 60;
-    private static final Pattern NUKI_ID_HEX_PATTERN = Pattern.compile("[A-F\\d]{8}", Pattern.CASE_INSENSITIVE);
+    private static final Pattern NUKI_ID_HEX_PATTERN = Pattern.compile("[A-F\\d]*[A-F]+[A-F\\d]*",
+            Pattern.CASE_INSENSITIVE);
 
     @Nullable
     protected ScheduledFuture<?> reInitJob;
     protected T configuration;
     @Nullable
     private NukiHttpClient nukiHttpClient;
+    protected final boolean readOnly;
+
+    public AbstractNukiDeviceHandler(Thing thing, boolean readOnly) {
+        super(thing);
+        this.readOnly = readOnly;
+        this.configuration = getConfigAs(getConfigurationClass());
+    }
 
     private static String hexToDecimal(String hexString) {
         return String.valueOf(Integer.parseInt(hexString, 16));
@@ -92,23 +101,36 @@ public abstract class AbstractNukiDeviceHandler<T extends NukiDeviceConfiguratio
         }
     }
 
-    public AbstractNukiDeviceHandler(Thing thing) {
-        super(thing);
-        this.configuration = getConfigAs(getConfigurationClass());
+    /**
+     * Performs migration of old device configuration
+     * 
+     * @return true if configuration was change and reload is needed
+     */
+    protected boolean migrateConfiguration() {
+        String nukiId = getConfig().get(NukiBindingConstants.PROPERTY_NUKI_ID).toString();
         // legacy support - check if nukiId is hexadecimal (which might have been set by previous binding version)
         // and convert it to decimal
-        if (NUKI_ID_HEX_PATTERN.matcher(this.configuration.nukiId).matches()) {
-            logger.warn(
-                    "SmartLock '{}' was created by old version of binding. It is recommended to delete it and discover again",
-                    thing.getUID());
-            this.thing.getConfiguration().put(NukiBindingConstants.PROPERTY_NUKI_ID,
-                    hexToDecimal(configuration.nukiId));
-            this.configuration = getConfigAs(getConfigurationClass());
+        if (NUKI_ID_HEX_PATTERN.matcher(nukiId).matches()) {
+            if (!readOnly) {
+                logger.warn(
+                        "SmartLock '{}' was created by old version of binding. It is recommended to delete it and discover again",
+                        thing.getUID());
+            }
+            Configuration newConfig = editConfiguration();
+            newConfig.put(NukiBindingConstants.PROPERTY_NUKI_ID, hexToDecimal(nukiId));
+            updateConfiguration(newConfig);
+            return true;
+        } else {
+            return false;
         }
     }
 
     @Override
     public void initialize() {
+        this.configuration = getConfigAs(getConfigurationClass());
+        if (migrateConfiguration()) {
+            this.configuration = getConfigAs(getConfigurationClass());
+        }
         scheduler.execute(this::initializeHandler);
     }
 
@@ -127,8 +149,7 @@ public abstract class AbstractNukiDeviceHandler<T extends NukiDeviceConfiguratio
     }
 
     private void initializeHandler(@Nullable ThingHandler handler, @Nullable ThingStatus bridgeStatus) {
-        if (handler instanceof NukiBridgeHandler && bridgeStatus != null) {
-            NukiBridgeHandler bridgeHandler = (NukiBridgeHandler) handler;
+        if (handler instanceof NukiBridgeHandler bridgeHandler && bridgeStatus != null) {
             if (bridgeStatus == ThingStatus.ONLINE) {
                 this.nukiHttpClient = bridgeHandler.getNukiHttpClient();
                 withHttpClient(client -> {
@@ -181,6 +202,7 @@ public abstract class AbstractNukiDeviceHandler<T extends NukiDeviceConfiguratio
         }
     }
 
+    @Override
     protected void triggerChannel(String channelId, String event) {
         Channel channel = thing.getChannel(channelId);
         if (channel != null) {
@@ -313,8 +335,8 @@ public abstract class AbstractNukiDeviceHandler<T extends NukiDeviceConfiguratio
         Bridge bridge = getBridge();
         if (bridge != null) {
             BridgeHandler bridgeHandler = bridge.getHandler();
-            if (bridgeHandler instanceof NukiBridgeHandler) {
-                scheduler.execute(() -> handler.accept((NukiBridgeHandler) bridgeHandler));
+            if (bridgeHandler instanceof NukiBridgeHandler nukiBridgeHandler) {
+                scheduler.execute(() -> handler.accept(nukiBridgeHandler));
             }
         }
     }

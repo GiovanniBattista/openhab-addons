@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2021 Contributors to the openHAB project
+ * Copyright (c) 2010-2024 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -19,7 +19,7 @@ import java.util.Optional;
  * The {@link ActuatorFunctionalities} class is an object model class that
  * mirrors the XML structure provided by the Plugwise Home Automation controller
  * for the collection of actuator functionalities. (e.g. 'offset', 'relay', et
- * cetera). It extends the {@link CustomCollection} class.
+ * cetera). It extends the {@link PlugwiseHACollection} class.
  * 
  * @author B. van Wetten - Initial contribution
  */
@@ -32,6 +32,19 @@ public class ActuatorFunctionalities extends PlugwiseHACollection<ActuatorFuncti
 
     public Optional<Boolean> getRelayLockState() {
         return this.getFunctionalityRelay().flatMap(ActuatorFunctionality::getRelayLockState)
+                .map(Boolean::parseBoolean);
+    }
+
+    public String getRegulationControl() {
+        ActuatorFunctionality functionality = this.getFunctionalityThermostat().orElse(null);
+        if (functionality != null) {
+            return functionality.getRegulationControl();
+        }
+        return null;
+    }
+
+    public Optional<Boolean> getCoolingAllowed() {
+        return this.getFunctionalityThermostat().flatMap(ActuatorFunctionality::getCoolingAllowed)
                 .map(Boolean::parseBoolean);
     }
 

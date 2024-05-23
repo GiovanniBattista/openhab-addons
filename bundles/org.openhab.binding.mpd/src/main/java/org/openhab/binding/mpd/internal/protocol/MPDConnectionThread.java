@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2021 Contributors to the openHAB project
+ * Copyright (c) 2010-2024 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -31,7 +31,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Class for communicating with the music player daemon through a IP connection
+ * Class for communicating with the music player daemon through an IP connection
  *
  * @author Stefan Röllin - Initial contribution
  */
@@ -54,6 +54,7 @@ public class MPDConnectionThread extends Thread {
 
     private final List<MPDCommand> pendingCommands = new ArrayList<>();
     private AtomicBoolean isInIdle = new AtomicBoolean(false);
+    private AtomicBoolean wakingUpFromIdle = new AtomicBoolean(false);
     private AtomicBoolean disposed = new AtomicBoolean(false);
 
     public MPDConnectionThread(MPDResponseListener listener, String address, Integer port, String password) {
@@ -70,7 +71,6 @@ public class MPDConnectionThread extends Thread {
             while (!disposed.get()) {
                 try {
                     synchronized (pendingCommands) {
-                        pendingCommands.clear();
                         pendingCommands.add(new MPDCommand("status"));
                         pendingCommands.add(new MPDCommand("currentsong"));
                     }
@@ -92,7 +92,16 @@ public class MPDConnectionThread extends Thread {
                 closeSocket();
 
                 if (!disposed.get()) {
-                    sleep(RECONNECTION_TIMEOUT_SEC * 1000);
+                    if (wakingUpFromIdle.compareAndSet(true, false)) {
+                        logger.debug("reconnecting immediately and keeping pending commands");
+                    } else {
+                        logger.debug("reconnecting in {} seconds and clearing pending commands...",
+                                RECONNECTION_TIMEOUT_SEC);
+                        sleep(RECONNECTION_TIMEOUT_SEC * 1000);
+                        synchronized (pendingCommands) {
+                            pendingCommands.clear();
+                        }
+                    }
                 }
             }
         } catch (InterruptedException ignore) {
@@ -246,6 +255,7 @@ public class MPDConnectionThread extends Thread {
 
     private void sendCommand(MPDCommand command) throws IOException {
         logger.trace("send command '{}'", command);
+        wakingUpFromIdle.set("noidle".equals(command.getCommand()));
         final Socket socket = this.socket;
         if (socket != null) {
             String line = command.asLine();

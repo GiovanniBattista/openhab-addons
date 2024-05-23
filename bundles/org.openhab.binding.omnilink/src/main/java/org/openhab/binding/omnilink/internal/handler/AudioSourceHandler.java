@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2021 Contributors to the openHAB project
+ * Copyright (c) 2010-2024 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -64,7 +64,7 @@ public class AudioSourceHandler extends AbstractOmnilinkHandler {
         final OmnilinkBridgeHandler bridgeHandler = getOmnilinkBridgeHandler();
         if (bridgeHandler != null) {
             updateStatus(ThingStatus.ONLINE);
-            if (((Boolean) getThing().getConfiguration().get(THING_PROPERTIES_AUTO_START)).booleanValue()) {
+            if (((Boolean) getThing().getConfiguration().get(THING_PROPERTIES_AUTOSTART)).booleanValue()) {
                 logger.debug("Autostart enabled, scheduling polling for Audio Source: {}", thingID);
                 schedulePolling();
             } else {
@@ -118,8 +118,8 @@ public class AudioSourceHandler extends AbstractOmnilinkHandler {
                 if (command instanceof RefreshType) {
                     updateState(CHANNEL_AUDIO_SOURCE_POLLING,
                             OnOffType.from((scheduledPolling != null && !scheduledPolling.isDone())));
-                } else if (command instanceof OnOffType) {
-                    handlePolling(channelUID, (OnOffType) command);
+                } else if (command instanceof OnOffType onOffCommand) {
+                    handlePolling(channelUID, onOffCommand);
                 } else {
                     logger.debug("Invalid command: {}, must be RefreshType or OnOffType", command);
                 }

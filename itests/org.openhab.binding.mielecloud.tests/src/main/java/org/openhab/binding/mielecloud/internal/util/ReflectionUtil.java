@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2021 Contributors to the openHAB project
+ * Copyright (c) 2010-2024 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -15,7 +15,6 @@ package org.openhab.binding.mielecloud.internal.util;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
-import java.lang.reflect.Modifier;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
@@ -81,29 +80,6 @@ public final class ReflectionUtil {
     }
 
     /**
-     * Sets an attribute declared as {@code private static final}.
-     *
-     * @param clazz The class owning the static attribute.
-     * @param fieldName The name of the attribute.
-     * @param value The new value.
-     * @throws NoSuchFieldException if no field with the given name exists.
-     * @throws SecurityException if the operation is not allowed.
-     * @throws IllegalArgumentException if one of the passed parameters is invalid.
-     * @throws IllegalAccessException if the field is enforcing Java language access control and is inaccessible.
-     */
-    public static void setPrivateStaticFinal(Class<?> clazz, String fieldName, @Nullable Object value)
-            throws NoSuchFieldException, SecurityException, IllegalArgumentException, IllegalAccessException {
-        Field field = clazz.getDeclaredField(fieldName);
-        field.setAccessible(true);
-
-        Field modifiersField = Field.class.getDeclaredField("modifiers");
-        modifiersField.setAccessible(true);
-        modifiersField.setInt(field, field.getModifiers() & ~Modifier.FINAL);
-
-        field.set(null, value);
-    }
-
-    /**
      * Invokes a private method on an object.
      *
      * @param object The object to invoke the method on.
@@ -114,7 +90,6 @@ public final class ReflectionUtil {
      * @throws SecurityException if the operation is not allowed.
      * @throws IllegalAccessException if the method is enforcing Java language access control and is inaccessible.
      * @throws IllegalArgumentException if one of the passed parameters is invalid.
-     * @throws InvocationTargetException if the invoked method throws an exception.
      */
     public static <T> T invokePrivate(Object object, String methodName, Object... parameters)
             throws NoSuchMethodException, SecurityException, IllegalAccessException, IllegalArgumentException {
@@ -138,7 +113,6 @@ public final class ReflectionUtil {
      * @throws SecurityException if the operation is not allowed.
      * @throws IllegalAccessException if the method is enforcing Java language access control and is inaccessible.
      * @throws IllegalArgumentException if one of the passed parameters is invalid.
-     * @throws InvocationTargetException if the invoked method throws an exception.
      */
     @SuppressWarnings("unchecked")
     public static <T> T invokePrivate(Object object, String methodName, Class<?>[] parameterTypes, Object... parameters)

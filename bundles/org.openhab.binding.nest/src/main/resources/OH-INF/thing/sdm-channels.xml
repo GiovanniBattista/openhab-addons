@@ -68,7 +68,7 @@
 	<channel-type id="SDMCameraEventImage">
 		<item-type>Image</item-type>
 		<label>Image</label>
-		<description>Static image based on a event</description>
+		<description>Static image based on an event</description>
 		<state readOnly="true"/>
 		<config-description-ref uri="channel-type:nest:sdm_camera_image"/>
 	</channel-type>
@@ -121,7 +121,7 @@
 
 	<!-- Thermostat -->
 	<channel-type id="SDMAmbientHumidity">
-		<item-type>Number:Dimensionless</item-type>
+		<item-type unitHint="%">Number:Dimensionless</item-type>
 		<label>Ambient Humidity</label>
 		<description>Lists the current ambient humidity percentage from the thermostat</description>
 		<category>Humidity</category>

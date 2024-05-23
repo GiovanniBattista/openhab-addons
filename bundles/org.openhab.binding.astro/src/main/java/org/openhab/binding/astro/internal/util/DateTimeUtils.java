@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2021 Contributors to the openHAB project
+ * Copyright (c) 2010-2024 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -192,7 +192,14 @@ public class DateTimeUtils {
                 next = calendar;
             }
         }
-        return next == null ? firstSeasonOfYear : next;
+        if (next == null) {
+            final Calendar nextYearSeason = (Calendar) firstSeasonOfYear.clone();
+
+            nextYearSeason.add(Calendar.YEAR, 1);
+            return nextYearSeason;
+        } else {
+            return next;
+        }
     }
 
     /**
@@ -202,6 +209,14 @@ public class DateTimeUtils {
         Calendar truncCal1 = truncateToMinute(cal1);
         Calendar truncCal2 = truncateToMinute(cal2);
         return truncCal1.getTimeInMillis() >= truncCal2.getTimeInMillis();
+    }
+
+    public static Calendar getAdjustedEarliest(Calendar cal, AstroChannelConfig config) {
+        return adjustTime(cal, getMinutesFromTime(config.earliest));
+    }
+
+    public static Calendar getAdjustedLatest(Calendar cal, AstroChannelConfig config) {
+        return adjustTime(cal, getMinutesFromTime(config.latest));
     }
 
     /**
@@ -216,11 +231,11 @@ public class DateTimeUtils {
             cCal = cOffset;
         }
 
-        Calendar cEarliest = adjustTime(cCal, getMinutesFromTime(config.earliest));
+        Calendar cEarliest = getAdjustedEarliest(cCal, config);
         if (cCal.before(cEarliest)) {
             return cEarliest;
         }
-        Calendar cLatest = adjustTime(cCal, getMinutesFromTime(config.latest));
+        Calendar cLatest = getAdjustedLatest(cCal, config);
         if (cCal.after(cLatest)) {
             return cLatest;
         }
@@ -235,6 +250,10 @@ public class DateTimeUtils {
             return cTime;
         }
         return cal;
+    }
+
+    public static Calendar createCalendarForToday(int hour, int minute) {
+        return DateTimeUtils.adjustTime(Calendar.getInstance(), hour * 60 + minute);
     }
 
     /**

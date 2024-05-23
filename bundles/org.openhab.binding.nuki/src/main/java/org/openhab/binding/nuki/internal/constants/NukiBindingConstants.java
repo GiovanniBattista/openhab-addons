@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2021 Contributors to the openHAB project
+ * Copyright (c) 2010-2024 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -12,7 +12,6 @@
  */
 package org.openhab.binding.nuki.internal.constants;
 
-import java.util.Collections;
 import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -21,12 +20,12 @@ import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.openhab.core.thing.ThingTypeUID;
 
 /**
- * The {@link NukiBinding} class defines common constants, which are
+ * The {@link NukiBindingConstants} class defines common constants, which are
  * used across the whole binding.
  *
  * @author Markus Katter - Initial contribution
- * @contributer Christian Hoefler - Door sensor integration
- * @contributer Jan Vybíral - Opener integration
+ * @author Christian Hoefler - Door sensor integration
+ * @author Jan Vybíral - Opener integration
  */
 @NonNullByDefault
 public class NukiBindingConstants {
@@ -38,9 +37,9 @@ public class NukiBindingConstants {
     public static final ThingTypeUID THING_TYPE_SMARTLOCK = new ThingTypeUID(BINDING_ID, "smartlock");
     public static final ThingTypeUID THING_TYPE_OPENER = new ThingTypeUID(BINDING_ID, "opener");
 
-    public static final Set<ThingTypeUID> THING_TYPE_BRIDGE_UIDS = Collections.singleton(THING_TYPE_BRIDGE);
-    public static final Set<ThingTypeUID> THING_TYPE_SMARTLOCK_UIDS = Collections.singleton(THING_TYPE_SMARTLOCK);
-    public static final Set<ThingTypeUID> THING_TYPE_OPENER_UIDS = Collections.singleton(THING_TYPE_OPENER);
+    public static final Set<ThingTypeUID> THING_TYPE_BRIDGE_UIDS = Set.of(THING_TYPE_BRIDGE);
+    public static final Set<ThingTypeUID> THING_TYPE_SMARTLOCK_UIDS = Set.of(THING_TYPE_SMARTLOCK);
+    public static final Set<ThingTypeUID> THING_TYPE_OPENER_UIDS = Set.of(THING_TYPE_OPENER);
 
     public static final Set<ThingTypeUID> SUPPORTED_THING_TYPES_UIDS = Stream
             .of(THING_TYPE_BRIDGE_UIDS, THING_TYPE_SMARTLOCK_UIDS, THING_TYPE_OPENER_UIDS).flatMap(Set::stream)
@@ -49,7 +48,8 @@ public class NukiBindingConstants {
     // Device Types
     public static final int DEVICE_SMART_LOCK = 0;
     public static final int DEVICE_OPENER = 2;
-    public static final Set<Integer> SUPPORTED_DEVICES = Set.of(DEVICE_OPENER, DEVICE_SMART_LOCK);
+    public static final int DEVICE_SMART_DOOR = 3;
+    public static final int DEVICE_SMART_LOCK_3 = 4;
 
     // Properties
     public static final String PROPERTY_WIFI_FIRMWARE_VERSION = "wifiFirmwareVersion";
@@ -59,6 +59,7 @@ public class NukiBindingConstants {
     public static final String PROPERTY_NAME = "name";
     public static final String PROPERTY_NUKI_ID = "nukiId";
     public static final String PROPERTY_BRIDGE_ID = "bridgeId";
+    public static final String PROPERTY_DEVICE_TYPE = "deviceType";
 
     // List of all Smart Lock Channel ids
     public static final String CHANNEL_SMARTLOCK_LOCK = "lock";

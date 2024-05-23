@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2021 Contributors to the openHAB project
+ * Copyright (c) 2010-2024 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -27,9 +27,10 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import org.eclipse.jdt.annotation.NonNullByDefault;
@@ -82,12 +83,13 @@ public class VerisureSession {
     private final Map<String, VerisureThingHandler<?>> verisureHandlers = new ConcurrentHashMap<>();
     private final Logger logger = LoggerFactory.getLogger(VerisureSession.class);
     private final Gson gson = new Gson();
-    private final List<DeviceStatusListener<VerisureThingDTO>> deviceStatusListeners = new CopyOnWriteArrayList<>();
+    private final Set<DeviceStatusListener<VerisureThingDTO>> deviceStatusListeners = ConcurrentHashMap.newKeySet();
     private final Map<BigDecimal, VerisureInstallation> verisureInstallations = new ConcurrentHashMap<>();
     private static final List<String> APISERVERLIST = Arrays.asList("https://m-api01.verisure.com",
             "https://m-api02.verisure.com");
     private int apiServerInUseIndex = 0;
     private int numberOfEvents = 15;
+    private static final int REQUEST_TIMEOUT_MS = 10_000;
     private static final String USER_NAME = "username";
     private static final String VID = "vid";
     private static final String VS_STEPUP = "vs-stepup";
@@ -184,7 +186,7 @@ public class VerisureSession {
 
     public void setVerisureThingHandler(VerisureThingHandler<?> vth, String deviceId) {
         verisureHandlers.put(deviceId, vth);
-    };
+    }
 
     public void removeVerisureThingHandler(String deviceId) {
         verisureHandlers.remove(deviceId);
@@ -333,6 +335,7 @@ public class VerisureSession {
         logger.debug("postVerisureAPI URL: {} Data:{}", url, data);
 
         Request request = httpClient.newRequest(url).method(HttpMethod.POST);
+        request.timeout(REQUEST_TIMEOUT_MS, TimeUnit.MILLISECONDS);
         if (isJSON) {
             request.header("content-type", "application/json");
         } else {
@@ -761,7 +764,7 @@ public class VerisureSession {
                         if (deviceId != null) {
                             deviceId = VerisureThingConfiguration.normalizeDeviceId(deviceId);
                             VerisureThingDTO mouseThing = verisureThings.get(deviceId);
-                            if (mouseThing != null && mouseThing instanceof VerisureMiceDetectionDTO) {
+                            if (mouseThing instanceof VerisureMiceDetectionDTO) {
                                 VerisureMiceDetectionDTO miceDetectorThing = (VerisureMiceDetectionDTO) mouseThing;
                                 miceDetectorThing.setTemperatureValue(climate.getTemperatureValue());
                                 miceDetectorThing.setTemperatureTime(climate.getTemperatureTimestamp());

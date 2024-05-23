@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2021 Contributors to the openHAB project
+ * Copyright (c) 2010-2024 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -34,8 +34,8 @@ import org.slf4j.LoggerFactory;
 public class SmartHomeDeviceStateGroupUpdateCalculator {
     private final Logger logger = LoggerFactory.getLogger(SmartHomeDeviceStateGroupUpdateCalculator.class);
 
-    private static final Integer UPDATE_INTERVAL_PRIVATE_SKILLS_IN_SECONDS = 10;
-    private static final Integer UPDATE_INTERVAL_PRIVATE_SKILLS_IN_SECONDS_TRACE = 600;
+    private static final Integer UPDATE_INTERVAL_PRIVATE_SKILLS_IN_SECONDS = 600;
+    private static final Integer UPDATE_INTERVAL_PRIVATE_SKILLS_IN_SECONDS_TRACE = 10;
     private static final Integer UPDATE_INTERVAL_ACOUSTIC_EVENTS_IN_SECONDS = 10;
     private Integer updateIntervalAmazonInSeconds;
     private Integer updateIntervalSkillsInSeconds;
@@ -106,7 +106,7 @@ public class SmartHomeDeviceStateGroupUpdateCalculator {
             }
         }
         // check which groups needs an update
-        Set<Integer> groupsToUpdate = new HashSet<Integer>();
+        Set<Integer> groupsToUpdate = new HashSet<>();
         for (UpdateGroup group : updateGroups.values()) {
             long millisecondsSinceLastUpdate = updateTimeStamp.getTime() - group.lastUpdated.getTime();
             if (syncAllGroups || millisecondsSinceLastUpdate >= group.intervalInSeconds * 1000) {

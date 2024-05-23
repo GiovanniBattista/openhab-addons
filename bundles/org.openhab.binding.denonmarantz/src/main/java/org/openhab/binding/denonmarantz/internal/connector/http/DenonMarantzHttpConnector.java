@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2021 Contributors to the openHAB project
+ * Copyright (c) 2010-2024 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -16,7 +16,6 @@ import java.beans.Introspector;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.StringWriter;
-import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
@@ -33,6 +32,7 @@ import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamReader;
 import javax.xml.stream.util.StreamReaderDelegate;
 
+import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.eclipse.jetty.client.HttpClient;
 import org.eclipse.jetty.client.api.Response;
@@ -40,14 +40,14 @@ import org.eclipse.jetty.client.api.Result;
 import org.openhab.binding.denonmarantz.internal.DenonMarantzState;
 import org.openhab.binding.denonmarantz.internal.config.DenonMarantzConfiguration;
 import org.openhab.binding.denonmarantz.internal.connector.DenonMarantzConnector;
-import org.openhab.binding.denonmarantz.internal.xml.entities.Deviceinfo;
-import org.openhab.binding.denonmarantz.internal.xml.entities.Main;
-import org.openhab.binding.denonmarantz.internal.xml.entities.ZoneStatus;
-import org.openhab.binding.denonmarantz.internal.xml.entities.ZoneStatusLite;
-import org.openhab.binding.denonmarantz.internal.xml.entities.commands.AppCommandRequest;
-import org.openhab.binding.denonmarantz.internal.xml.entities.commands.AppCommandResponse;
-import org.openhab.binding.denonmarantz.internal.xml.entities.commands.CommandRx;
-import org.openhab.binding.denonmarantz.internal.xml.entities.commands.CommandTx;
+import org.openhab.binding.denonmarantz.internal.xml.dto.Deviceinfo;
+import org.openhab.binding.denonmarantz.internal.xml.dto.Main;
+import org.openhab.binding.denonmarantz.internal.xml.dto.ZoneStatus;
+import org.openhab.binding.denonmarantz.internal.xml.dto.ZoneStatusLite;
+import org.openhab.binding.denonmarantz.internal.xml.dto.commands.AppCommandRequest;
+import org.openhab.binding.denonmarantz.internal.xml.dto.commands.AppCommandResponse;
+import org.openhab.binding.denonmarantz.internal.xml.dto.commands.CommandRx;
+import org.openhab.binding.denonmarantz.internal.xml.dto.commands.CommandTx;
 import org.openhab.core.io.net.http.HttpUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -60,6 +60,7 @@ import org.slf4j.LoggerFactory;
  * @author Jeroen Idserda - Initial Contribution (1.x Binding)
  * @author Jan-Willem Veldhuis - Refactored for 2.x
  */
+@NonNullByDefault
 public class DenonMarantzHttpConnector extends DenonMarantzConnector {
 
     private Logger logger = LoggerFactory.getLogger(DenonMarantzHttpConnector.class);
@@ -89,13 +90,11 @@ public class DenonMarantzHttpConnector extends DenonMarantzConnector {
 
     private final HttpClient httpClient;
 
-    private ScheduledFuture<?> pollingJob;
+    private @Nullable ScheduledFuture<?> pollingJob;
 
     public DenonMarantzHttpConnector(DenonMarantzConfiguration config, DenonMarantzState state,
             ScheduledExecutorService scheduler, HttpClient httpClient) {
-        this.config = config;
-        this.scheduler = scheduler;
-        this.state = state;
+        super(config, scheduler, state);
         this.cmdUrl = String.format("http://%s:%d/goform/formiPhoneAppDirect.xml?", config.getHost(),
                 config.getHttpPort());
         this.statusUrl = String.format("http://%s:%d/goform/", config.getHost(), config.getHttpPort());
@@ -144,11 +143,13 @@ public class DenonMarantzHttpConnector extends DenonMarantzConnector {
     }
 
     private boolean isPolling() {
+        ScheduledFuture<?> pollingJob = this.pollingJob;
         return pollingJob != null && !pollingJob.isCancelled();
     }
 
     private void stopPolling() {
-        if (isPolling()) {
+        ScheduledFuture<?> pollingJob = this.pollingJob;
+        if (pollingJob != null) {
             pollingJob.cancel(true);
             logger.debug("HTTP polling stopped.");
         }
@@ -167,27 +168,22 @@ public class DenonMarantzHttpConnector extends DenonMarantzConnector {
     @Override
     protected void internalSendCommand(String command) {
         logger.debug("Sending command '{}'", command);
-        if (command == null || command.isBlank()) {
+        if (command.isBlank()) {
             logger.warn("Trying to send empty command");
             return;
         }
 
-        try {
-            String url = cmdUrl + URLEncoder.encode(command, Charset.defaultCharset().displayName());
-            logger.trace("Calling url {}", url);
+        String url = cmdUrl + URLEncoder.encode(command, Charset.defaultCharset());
+        logger.trace("Calling url {}", url);
 
-            httpClient.newRequest(url).timeout(5, TimeUnit.SECONDS).send(new Response.CompleteListener() {
-                @Override
-                public void onComplete(Result result) {
-                    if (result.getResponse().getStatus() != 200) {
-                        logger.warn("Error {} while sending command", result.getResponse().getReason());
-                    }
+        httpClient.newRequest(url).timeout(5, TimeUnit.SECONDS).send(new Response.CompleteListener() {
+            @Override
+            public void onComplete(@Nullable Result result) {
+                if (result != null && result.getResponse().getStatus() != 200) {
+                    logger.warn("Error {} while sending command", result.getResponse().getReason());
                 }
-            });
-
-        } catch (UnsupportedEncodingException e) {
-            logger.warn("Error sending command", e);
-        }
+            }
+        });
     }
 
     private void updateMain() throws IOException {
@@ -261,11 +257,21 @@ public class DenonMarantzHttpConnector extends DenonMarantzConnector {
         AppCommandRequest request = AppCommandRequest.of(CommandTx.CMD_NET_STATUS);
         AppCommandResponse response = postDocument(url, AppCommandResponse.class, request);
 
-        if (response != null) {
-            CommandRx titleInfo = response.getCommands().get(0);
-            state.setNowPlayingArtist(titleInfo.getText("artist"));
-            state.setNowPlayingAlbum(titleInfo.getText("album"));
-            state.setNowPlayingTrack(titleInfo.getText("track"));
+        if (response == null) {
+            return;
+        }
+        CommandRx titleInfo = response.getCommands().get(0);
+        String artist = titleInfo.getText("artist");
+        if (artist != null) {
+            state.setNowPlayingArtist(artist);
+        }
+        String album = titleInfo.getText("album");
+        if (album != null) {
+            state.setNowPlayingAlbum(album);
+        }
+        String track = titleInfo.getText("track");
+        if (track != null) {
+            state.setNowPlayingTrack(track);
         }
     }
 
@@ -364,12 +370,12 @@ public class DenonMarantzHttpConnector extends DenonMarantzConnector {
 
         @Override
         public String getAttributeLocalName(int index) {
-            return Introspector.decapitalize(super.getAttributeLocalName(index));
+            return Introspector.decapitalize(super.getAttributeLocalName(index)).intern();
         }
 
         @Override
         public String getLocalName() {
-            return Introspector.decapitalize(super.getLocalName());
+            return Introspector.decapitalize(super.getLocalName()).intern();
         }
     }
 }

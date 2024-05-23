@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2021 Contributors to the openHAB project
+ * Copyright (c) 2010-2024 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -21,7 +21,10 @@ import java.io.IOException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.util.Arrays;
+import java.util.Set;
 
+import org.eclipse.jdt.annotation.NonNullByDefault;
+import org.eclipse.jdt.annotation.Nullable;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
@@ -33,6 +36,7 @@ import org.openhab.core.util.HexUtils;
  * @author Wouter Born - Initial contribution
  */
 @Timeout(value = 10)
+@NonNullByDefault
 public class WakeOnLanPacketSenderTest {
 
     private void assertValidMagicPacket(byte[] macBytes, byte[] packet) {
@@ -102,7 +106,8 @@ public class WakeOnLanPacketSenderTest {
         assertThrows(IllegalStateException.class, () -> sendWOLTest(null, 4444));
     }
 
-    private void sendWOLTest(String hostname, Integer port) throws InterruptedException, IOException {
+    private void sendWOLTest(@Nullable String hostname, @Nullable Integer port)
+            throws InterruptedException, IOException {
         DatagramSocket socket = new DatagramSocket(4444);
 
         byte[] buf = new byte[256];
@@ -113,7 +118,7 @@ public class WakeOnLanPacketSenderTest {
         }
 
         try {
-            WakeOnLanPacketSender sender = new WakeOnLanPacketSender("6f70656e4841", hostname, port);
+            WakeOnLanPacketSender sender = new WakeOnLanPacketSender("6f70656e4841", hostname, port, Set.of());
             sender.sendWakeOnLanPacketViaIp();
 
             // This Test is only applicable for IP Requests

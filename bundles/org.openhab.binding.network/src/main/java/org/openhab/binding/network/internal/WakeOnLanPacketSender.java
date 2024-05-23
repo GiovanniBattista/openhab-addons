@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2021 Contributors to the openHAB project
+ * Copyright (c) 2010-2024 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -13,13 +13,23 @@
 package org.openhab.binding.network.internal;
 
 import java.io.IOException;
-import java.net.*;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.InetAddress;
+import java.net.InetSocketAddress;
+import java.net.InterfaceAddress;
+import java.net.NetworkInterface;
+import java.net.SocketAddress;
+import java.net.SocketException;
+import java.net.UnknownHostException;
 import java.util.Arrays;
+import java.util.Enumeration;
+import java.util.HashSet;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 
-import org.apache.commons.lang3.StringUtils;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.openhab.core.net.NetUtil;
@@ -39,29 +49,30 @@ public class WakeOnLanPacketSender {
 
     // Wake-on-LAN magic packet constants
     static final int PREFIX_BYTE_SIZE = 6;
-    static final int MAC_REPETITIONS = 16;
+    private static final int MAC_REPETITIONS = 16;
     static final int MAC_BYTE_SIZE = 6;
     static final int MAGIC_PACKET_BYTE_SIZE = PREFIX_BYTE_SIZE + MAC_REPETITIONS * MAC_BYTE_SIZE;
-    static final String[] MAC_SEPARATORS = new String[] { ":", "-" };
+    private static final String[] MAC_SEPARATORS = new String[] { ":", "-" };
 
     private final Logger logger = LoggerFactory.getLogger(WakeOnLanPacketSender.class);
 
     private final String macAddress;
 
-    @Nullable
-    private final String hostname;
-
-    @Nullable
-    private final Integer port;
+    private final @Nullable String hostname;
+    private final @Nullable Integer port;
+    private final Set<String> networkInterfaceNames;
 
     private final Consumer<byte[]> magicPacketMacSender;
     private final Consumer<byte[]> magicPacketIpSender;
 
-    public WakeOnLanPacketSender(String macAddress, @Nullable String hostname, @Nullable Integer port) {
-        logger.debug("initialized WOL Packet Sender (mac: {}, hostname: {}, port: {}", macAddress, hostname, port);
+    public WakeOnLanPacketSender(String macAddress, @Nullable String hostname, @Nullable Integer port,
+            Set<String> networkInterfaceNames) {
+        logger.debug("initialized WOL Packet Sender (mac: {}, hostname: {}, port: {}, networkInterfaceNames: {})",
+                macAddress, hostname, port, networkInterfaceNames);
         this.macAddress = macAddress;
         this.hostname = hostname;
         this.port = port;
+        this.networkInterfaceNames = networkInterfaceNames;
         this.magicPacketMacSender = this::sendMagicPacketViaMac;
         this.magicPacketIpSender = this::sendMagicPacketViaIp;
     }
@@ -70,10 +81,11 @@ public class WakeOnLanPacketSender {
      * Used for testing only.
      */
     public WakeOnLanPacketSender(String macAddress) {
-        logger.debug("initialized WOL Packet Sender (mac: {}", macAddress);
+        logger.debug("initialized WOL Packet Sender (mac: {})", macAddress);
         this.macAddress = macAddress;
         this.hostname = null;
         this.port = null;
+        this.networkInterfaceNames = Set.of();
         this.magicPacketMacSender = this::sendMagicPacketViaMac;
         this.magicPacketIpSender = this::sendMagicPacketViaIp;
     }
@@ -85,6 +97,7 @@ public class WakeOnLanPacketSender {
         this.macAddress = macAddress;
         this.hostname = null;
         this.port = null;
+        this.networkInterfaceNames = Set.of();
         this.magicPacketMacSender = magicPacketSender;
         this.magicPacketIpSender = this::sendMagicPacketViaIp;
     }
@@ -131,10 +144,10 @@ public class WakeOnLanPacketSender {
 
     private void sendMagicPacketViaIp(byte[] magicPacket) {
         try (DatagramSocket socket = new DatagramSocket()) {
-            if (!StringUtils.isEmpty(this.hostname)) {
+            if (hostname != null && !hostname.isBlank()) {
                 logger.debug("Sending Wake-on-LAN Packet via IP Address");
-                SocketAddress socketAddress = new InetSocketAddress(this.hostname,
-                        Objects.requireNonNullElse(this.port, WOL_UDP_PORT));
+                SocketAddress socketAddress = new InetSocketAddress(hostname,
+                        Objects.requireNonNullElse(port, WOL_UDP_PORT));
                 sendMagicPacketToIp(magicPacket, socket, socketAddress);
             } else {
                 throw new IllegalStateException("Hostname is not set!");
@@ -170,8 +183,39 @@ public class WakeOnLanPacketSender {
         logger.info("Wake-on-LAN packets sent (IP address: {})", ip);
     }
 
+    private Set<String> configuredBroadcastAddresses() {
+        if (networkInterfaceNames.isEmpty()) {
+            return Set.of();
+        }
+
+        try {
+            Enumeration<NetworkInterface> niEnum = NetworkInterface.getNetworkInterfaces();
+            Set<String> broadcastAddresses = new HashSet<>();
+            while (niEnum.hasMoreElements()) {
+                NetworkInterface networkInterface = niEnum.nextElement();
+                if (networkInterfaceNames.contains(networkInterface.getName())) {
+                    for (InterfaceAddress interfaceAddress : networkInterface.getInterfaceAddresses()) {
+                        InetAddress broadcast = interfaceAddress.getBroadcast();
+                        if (broadcast != null) {
+                            broadcastAddresses.add(broadcast.getHostAddress());
+                        }
+                    }
+                }
+            }
+            return broadcastAddresses;
+        } catch (SocketException e) {
+            logger.debug("Unable to determine configured broadcast addresses", e);
+            return Set.of();
+        }
+    }
+
     private Stream<InetAddress> broadcastAddressStream() {
+        Set<String> configuredBroadcastAddresses = configuredBroadcastAddresses();
         return NetUtil.getAllBroadcastAddresses().stream().map(address -> {
+            if (!networkInterfaceNames.isEmpty() && !configuredBroadcastAddresses.contains(address)) {
+                logger.debug("'{}' is not a broadcast address of the configured network interfaces", address);
+                return null;
+            }
             try {
                 return InetAddress.getByName(address);
             } catch (UnknownHostException e) {

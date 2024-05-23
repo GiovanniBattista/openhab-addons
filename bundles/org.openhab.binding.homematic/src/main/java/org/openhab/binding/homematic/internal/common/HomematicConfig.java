@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2021 Contributors to the openHAB project
+ * Copyright (c) 2010-2024 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -12,6 +12,9 @@
  */
 package org.openhab.binding.homematic.internal.common;
 
+import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
+
 import org.openhab.binding.homematic.internal.model.HmChannel;
 import org.openhab.binding.homematic.internal.model.HmGatewayInfo;
 import org.openhab.binding.homematic.internal.model.HmInterface;
@@ -22,9 +25,6 @@ import org.openhab.binding.homematic.internal.model.HmInterface;
  * @author Gerhard Riegler - Initial contribution
  */
 public class HomematicConfig {
-    private static final String ISO_ENCODING = "ISO-8859-1";
-    private static final String UTF_ENCODING = "UTF-8";
-
     private static final String GATEWAY_TYPE_AUTO = "AUTO";
     private static final String GATEWAY_TYPE_CCU = "CCU";
     private static final String GATEWAY_TYPE_NOCCU = "NOCCU";
@@ -58,6 +58,11 @@ public class HomematicConfig {
     private int bufferSize = 2048;
 
     private HmGatewayInfo gatewayInfo;
+    private int callbackRegTimeout;
+
+    private boolean useAuthentication;
+    private String userName;
+    private String password;
 
     /**
      * Returns the Homematic gateway address.
@@ -113,6 +118,20 @@ public class HomematicConfig {
      */
     public void setBinCallbackPort(int binCallbackPort) {
         this.binCallbackPort = binCallbackPort;
+    }
+
+    /**
+     * Sets timeout for callback registration.
+     */
+    public void setCallbackRegTimeout(int timeout) {
+        this.callbackRegTimeout = timeout;
+    }
+
+    /**
+     * Returns timeout for callback registrations.
+     */
+    public int getCallbackRegTimeout() {
+        return callbackRegTimeout;
     }
 
     /**
@@ -258,6 +277,48 @@ public class HomematicConfig {
     }
 
     /**
+     * Returns true if authorization for the gateway has to be used; otherwise false
+     */
+    public boolean getUseAuthentication() {
+        return useAuthentication;
+    }
+
+    /**
+     * Sets if authorization for the gateway has to be used
+     */
+    public void setUseAuthentication(Boolean useAuthentication) {
+        this.useAuthentication = useAuthentication;
+    }
+
+    /**
+     * Returns the user name for authorize against the gateway
+     */
+    public String getUserName() {
+        return userName;
+    }
+
+    /**
+     * Sets the user name for authorize against the gateway
+     */
+    public void setUserName(String userName) {
+        this.userName = userName;
+    }
+
+    /**
+     * Returns the password for authorize against the gateway
+     */
+    public String getPassword() {
+        return password;
+    }
+
+    /**
+     * Sets the password for authorize against the gateway
+     */
+    public void setPassword(String password) {
+        this.password = password;
+    }
+
+    /**
      * Returns the Homematic gateway port of the interfaces.
      */
     public int getRpcPort(HmInterface hmInterface) {
@@ -345,13 +406,13 @@ public class HomematicConfig {
     }
 
     /**
-     * Returns the encoding that is suitable on requests to & responds from the Homematic gateway.
+     * Returns the encoding that is suitable on requests to and responds from the Homematic gateway.
      */
-    public String getEncoding() {
+    public Charset getEncoding() {
         if (gatewayInfo != null && gatewayInfo.isHomegear()) {
-            return UTF_ENCODING;
+            return StandardCharsets.UTF_8;
         } else {
-            return ISO_ENCODING;
+            return StandardCharsets.ISO_8859_1;
         }
     }
 
@@ -378,12 +439,12 @@ public class HomematicConfig {
 
     @Override
     public String toString() {
-        return String.format(
-                "%s[gatewayAddress=%s,callbackHost=%s,xmlCallbackPort=%d,binCallbackPort=%d,"
-                        + "gatewayType=%s,rfPort=%d,wiredPort=%d,hmIpPort=%d,cuxdPort=%d,groupPort=%d,timeout=%d,"
-                        + "discoveryTimeToLive=%d,installModeDuration=%d,socketMaxAlive=%d]",
-                getClass().getSimpleName(), gatewayAddress, callbackHost, xmlCallbackPort, binCallbackPort, gatewayType,
-                getRfPort(), getWiredPort(), getHmIpPort(), getCuxdPort(), getGroupPort(), timeout, discoveryTimeToLive,
-                installModeDuration, socketMaxAlive);
+        return String.format("""
+                %s[gatewayAddress=%s,callbackHost=%s,xmlCallbackPort=%d,binCallbackPort=%d,\
+                gatewayType=%s,rfPort=%d,wiredPort=%d,hmIpPort=%d,cuxdPort=%d,groupPort=%d,timeout=%d,\
+                discoveryTimeToLive=%d,installModeDuration=%d,socketMaxAlive=%d]\
+                """, getClass().getSimpleName(), gatewayAddress, callbackHost, xmlCallbackPort, binCallbackPort,
+                gatewayType, getRfPort(), getWiredPort(), getHmIpPort(), getCuxdPort(), getGroupPort(), timeout,
+                discoveryTimeToLive, installModeDuration, socketMaxAlive);
     }
 }

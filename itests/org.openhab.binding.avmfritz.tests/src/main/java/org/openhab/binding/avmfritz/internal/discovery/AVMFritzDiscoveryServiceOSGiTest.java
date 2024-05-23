@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2021 Contributors to the openHAB project
+ * Copyright (c) 2010-2024 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -29,6 +29,7 @@ import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.openhab.binding.avmfritz.internal.dto.AVMFritzBaseModel;
 import org.openhab.binding.avmfritz.internal.dto.DeviceListModel;
@@ -48,6 +49,7 @@ import org.openhab.core.thing.ThingUID;
  * @author Ulrich Mertin - Added support for HAN-FUN blinds
  */
 @NonNullByDefault
+@Disabled("Often blocks indefinitely, see: https://github.com/openhab/openhab-addons/issues/16536")
 public class AVMFritzDiscoveryServiceOSGiTest extends AVMFritzThingHandlerOSGiTest {
 
     private static final ThingUID BRIGE_THING_ID = new ThingUID("avmfritz:fritzbox:1");
@@ -89,21 +91,24 @@ public class AVMFritzDiscoveryServiceOSGiTest extends AVMFritzThingHandlerOSGiTe
 
     @Test
     public void correctSupportedTypes() {
-        assertEquals(16, discovery.getSupportedThingTypes().size());
+        assertEquals(19, discovery.getSupportedThingTypes().size());
         assertTrue(discovery.getSupportedThingTypes().contains(DECT100_THING_TYPE));
         assertTrue(discovery.getSupportedThingTypes().contains(DECT200_THING_TYPE));
         assertTrue(discovery.getSupportedThingTypes().contains(DECT210_THING_TYPE));
         assertTrue(discovery.getSupportedThingTypes().contains(DECT300_THING_TYPE));
         assertTrue(discovery.getSupportedThingTypes().contains(DECT301_THING_TYPE));
+        assertTrue(discovery.getSupportedThingTypes().contains(DECT302_THING_TYPE));
         assertTrue(discovery.getSupportedThingTypes().contains(DECT400_THING_TYPE));
         assertTrue(discovery.getSupportedThingTypes().contains(DECT440_THING_TYPE));
         assertTrue(discovery.getSupportedThingTypes().contains(DECT500_THING_TYPE));
-        assertTrue(discovery.getSupportedThingTypes().contains(PL546E_THING_TYPE));
+        assertTrue(discovery.getSupportedThingTypes().contains(POWERLINE546E_THING_TYPE));
         assertTrue(discovery.getSupportedThingTypes().contains(COMETDECT_THING_TYPE));
         assertTrue(discovery.getSupportedThingTypes().contains(HAN_FUN_CONTACT_THING_TYPE));
         assertTrue(discovery.getSupportedThingTypes().contains(HAN_FUN_SWITCH_THING_TYPE));
         assertTrue(discovery.getSupportedThingTypes().contains(HAN_FUN_ON_OFF_THING_TYPE));
         assertTrue(discovery.getSupportedThingTypes().contains(HAN_FUN_BLINDS_THING_TYPE));
+        assertTrue(discovery.getSupportedThingTypes().contains(HAN_FUN_COLOR_BULB_THING_TYPE));
+        assertTrue(discovery.getSupportedThingTypes().contains(HAN_FUN_DIMMABLE_BULB_THING_TYPE));
         assertTrue(discovery.getSupportedThingTypes().contains(GROUP_HEATING_THING_TYPE));
         assertTrue(discovery.getSupportedThingTypes().contains(GROUP_SWITCH_THING_TYPE));
     }
@@ -508,7 +513,7 @@ public class AVMFritzDiscoveryServiceOSGiTest extends AVMFritzThingHandlerOSGiTe
 
         assertEquals(DiscoveryResultFlag.NEW, discoveryResult.getFlag());
         assertEquals(new ThingUID("avmfritz:FRITZ_Powerline_546E:1:5C_49_79_F0_A3_84"), discoveryResult.getThingUID());
-        assertEquals(PL546E_THING_TYPE, discoveryResult.getThingTypeUID());
+        assertEquals(POWERLINE546E_THING_TYPE, discoveryResult.getThingTypeUID());
         assertEquals(BRIGE_THING_ID, discoveryResult.getBridgeUID());
         assertEquals("5C:49:79:F0:A3:84", discoveryResult.getProperties().get(CONFIG_AIN));
         assertEquals("AVM", discoveryResult.getProperties().get(PROPERTY_VENDOR));

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2021 Contributors to the openHAB project
+ * Copyright (c) 2010-2024 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -15,13 +15,11 @@ package org.openhab.binding.openweathermap.internal.connection;
 import static org.eclipse.jetty.http.HttpMethod.GET;
 import static org.eclipse.jetty.http.HttpStatus.*;
 
-import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -39,13 +37,14 @@ import org.openhab.binding.openweathermap.internal.config.OpenWeatherMapAPIConfi
 import org.openhab.binding.openweathermap.internal.dto.OpenWeatherMapJsonAirPollutionData;
 import org.openhab.binding.openweathermap.internal.dto.OpenWeatherMapJsonDailyForecastData;
 import org.openhab.binding.openweathermap.internal.dto.OpenWeatherMapJsonHourlyForecastData;
-import org.openhab.binding.openweathermap.internal.dto.OpenWeatherMapJsonUVIndexData;
 import org.openhab.binding.openweathermap.internal.dto.OpenWeatherMapJsonWeatherData;
-import org.openhab.binding.openweathermap.internal.dto.onecall.OpenWeatherMapOneCallAPIData;
-import org.openhab.binding.openweathermap.internal.dto.onecallhist.OpenWeatherMapOneCallHistAPIData;
+import org.openhab.binding.openweathermap.internal.dto.OpenWeatherMapOneCallAPIData;
+import org.openhab.binding.openweathermap.internal.dto.OpenWeatherMapOneCallHistAPIData;
 import org.openhab.binding.openweathermap.internal.handler.OpenWeatherMapAPIHandler;
 import org.openhab.core.cache.ByteArrayFileCache;
 import org.openhab.core.cache.ExpiringCacheMap;
+import org.openhab.core.i18n.CommunicationException;
+import org.openhab.core.i18n.ConfigurationException;
 import org.openhab.core.io.net.http.HttpUtil;
 import org.openhab.core.library.types.PointType;
 import org.openhab.core.library.types.RawType;
@@ -87,17 +86,15 @@ public class OpenWeatherMapConnection {
     private static final String THREE_HOUR_FORECAST_URL = "https://api.openweathermap.org/data/2.5/forecast";
     // 16 day / daily forecast (see https://openweathermap.org/forecast16)
     private static final String DAILY_FORECAST_URL = "https://api.openweathermap.org/data/2.5/forecast/daily";
-    // UV Index (see https://openweathermap.org/api/uvi)
-    private static final String UVINDEX_URL = "https://api.openweathermap.org/data/2.5/uvi";
-    private static final String UVINDEX_FORECAST_URL = "https://api.openweathermap.org/data/2.5/uvi/forecast";
     // Air Pollution (see https://openweathermap.org/api/air-pollution)
     private static final String AIR_POLLUTION_URL = "https://api.openweathermap.org/data/2.5/air_pollution";
     private static final String AIR_POLLUTION_FORECAST_URL = "https://api.openweathermap.org/data/2.5/air_pollution/forecast";
     // Weather icons (see https://openweathermap.org/weather-conditions)
     private static final String ICON_URL = "https://openweathermap.org/img/w/%s.png";
     // One Call API (see https://openweathermap.org/api/one-call-api )
-    private static final String ONECALL_URL = "https://api.openweathermap.org/data/2.5/onecall";
-    private static final String ONECALL_HISTORY_URL = "https://api.openweathermap.org/data/2.5/onecall/timemachine";
+    private static final String ONECALL_URL = "https://api.openweathermap.org/data";
+    private static final String ONECALL_DATA_SUFFIX_URL = "onecall";
+    private static final String ONECALL_HISTORY_SUFFIX_URL = "onecall/timemachine";
 
     private final OpenWeatherMapAPIHandler handler;
     private final HttpClient httpClient;
@@ -121,11 +118,11 @@ public class OpenWeatherMapConnection {
      * @param location location represented as {@link PointType}
      * @return the current weather data
      * @throws JsonSyntaxException
-     * @throws OpenWeatherMapCommunicationException
-     * @throws OpenWeatherMapConfigurationException
+     * @throws CommunicationException
+     * @throws ConfigurationException
      */
     public synchronized @Nullable OpenWeatherMapJsonWeatherData getWeatherData(@Nullable PointType location)
-            throws JsonSyntaxException, OpenWeatherMapCommunicationException, OpenWeatherMapConfigurationException {
+            throws JsonSyntaxException, CommunicationException, ConfigurationException {
         return gson.fromJson(
                 getResponseFromCache(
                         buildURL(WEATHER_URL, getRequestParams(handler.getOpenWeatherMapAPIConfig(), location))),
@@ -139,14 +136,14 @@ public class OpenWeatherMapConnection {
      * @param count number of hours
      * @return the hourly forecast data
      * @throws JsonSyntaxException
-     * @throws OpenWeatherMapCommunicationException
-     * @throws OpenWeatherMapConfigurationException
+     * @throws CommunicationException
+     * @throws ConfigurationException
      */
     public synchronized @Nullable OpenWeatherMapJsonHourlyForecastData getHourlyForecastData(
             @Nullable PointType location, int count)
-            throws JsonSyntaxException, OpenWeatherMapCommunicationException, OpenWeatherMapConfigurationException {
+            throws JsonSyntaxException, CommunicationException, ConfigurationException {
         if (count <= 0) {
-            throw new OpenWeatherMapConfigurationException("@text/offline.conf-error-not-supported-number-of-hours");
+            throw new ConfigurationException("@text/offline.conf-error-not-supported-number-of-hours");
         }
 
         Map<String, String> params = getRequestParams(handler.getOpenWeatherMapAPIConfig(), location);
@@ -163,14 +160,13 @@ public class OpenWeatherMapConnection {
      * @param count number of days
      * @return the daily forecast data
      * @throws JsonSyntaxException
-     * @throws OpenWeatherMapCommunicationException
-     * @throws OpenWeatherMapConfigurationException
+     * @throws CommunicationException
+     * @throws ConfigurationException
      */
     public synchronized @Nullable OpenWeatherMapJsonDailyForecastData getDailyForecastData(@Nullable PointType location,
-            int count)
-            throws JsonSyntaxException, OpenWeatherMapCommunicationException, OpenWeatherMapConfigurationException {
+            int count) throws JsonSyntaxException, CommunicationException, ConfigurationException {
         if (count <= 0) {
-            throw new OpenWeatherMapConfigurationException("@text/offline.conf-error-not-supported-number-of-days");
+            throw new ConfigurationException("@text/offline.conf-error-not-supported-number-of-days");
         }
 
         Map<String, String> params = getRequestParams(handler.getOpenWeatherMapAPIConfig(), location);
@@ -181,57 +177,16 @@ public class OpenWeatherMapConnection {
     }
 
     /**
-     * Requests the UV Index data for the given location (see https://openweathermap.org/api/uvi).
-     *
-     * @param location location represented as {@link PointType}
-     * @return the UV Index data
-     * @throws JsonSyntaxException
-     * @throws OpenWeatherMapCommunicationException
-     * @throws OpenWeatherMapConfigurationException
-     */
-    public synchronized @Nullable OpenWeatherMapJsonUVIndexData getUVIndexData(@Nullable PointType location)
-            throws JsonSyntaxException, OpenWeatherMapCommunicationException, OpenWeatherMapConfigurationException {
-        return gson.fromJson(
-                getResponseFromCache(
-                        buildURL(UVINDEX_URL, getRequestParams(handler.getOpenWeatherMapAPIConfig(), location))),
-                OpenWeatherMapJsonUVIndexData.class);
-    }
-
-    /**
-     * Requests the UV Index forecast data for the given location (see https://openweathermap.org/api/uvi).
-     *
-     * @param location location represented as {@link PointType}
-     * @return the UV Index forecast data
-     * @throws JsonSyntaxException
-     * @throws OpenWeatherMapCommunicationException
-     * @throws OpenWeatherMapConfigurationException
-     */
-    public synchronized @Nullable List<OpenWeatherMapJsonUVIndexData> getUVIndexForecastData(
-            @Nullable PointType location, int count)
-            throws JsonSyntaxException, OpenWeatherMapCommunicationException, OpenWeatherMapConfigurationException {
-        if (count <= 0) {
-            throw new OpenWeatherMapConfigurationException(
-                    "@text/offline.conf-error-not-supported-uvindex-number-of-days");
-        }
-
-        Map<String, String> params = getRequestParams(handler.getOpenWeatherMapAPIConfig(), location);
-        params.put(PARAM_FORECAST_CNT, Integer.toString(count));
-
-        return Arrays.asList(gson.fromJson(getResponseFromCache(buildURL(UVINDEX_FORECAST_URL, params)),
-                OpenWeatherMapJsonUVIndexData[].class));
-    }
-
-    /**
      * Requests the Air Pollution data for the given location (see https://openweathermap.org/api/air-pollution).
      *
      * @param location location represented as {@link PointType}
      * @return the Air Pollution data
      * @throws JsonSyntaxException
-     * @throws OpenWeatherMapCommunicationException
-     * @throws OpenWeatherMapConfigurationException
+     * @throws CommunicationException
+     * @throws ConfigurationException
      */
     public synchronized @Nullable OpenWeatherMapJsonAirPollutionData getAirPollutionData(@Nullable PointType location)
-            throws JsonSyntaxException, OpenWeatherMapCommunicationException, OpenWeatherMapConfigurationException {
+            throws JsonSyntaxException, CommunicationException, ConfigurationException {
         return gson.fromJson(
                 getResponseFromCache(
                         buildURL(AIR_POLLUTION_URL, getRequestParams(handler.getOpenWeatherMapAPIConfig(), location))),
@@ -245,12 +200,11 @@ public class OpenWeatherMapConnection {
      * @param location location represented as {@link PointType}
      * @return the Air Pollution forecast data
      * @throws JsonSyntaxException
-     * @throws OpenWeatherMapCommunicationException
-     * @throws OpenWeatherMapConfigurationException
+     * @throws CommunicationException
+     * @throws ConfigurationException
      */
     public synchronized @Nullable OpenWeatherMapJsonAirPollutionData getAirPollutionForecastData(
-            @Nullable PointType location)
-            throws JsonSyntaxException, OpenWeatherMapCommunicationException, OpenWeatherMapConfigurationException {
+            @Nullable PointType location) throws JsonSyntaxException, CommunicationException, ConfigurationException {
         return gson.fromJson(
                 getResponseFromCache(buildURL(AIR_POLLUTION_FORECAST_URL,
                         getRequestParams(handler.getOpenWeatherMapAPIConfig(), location))),
@@ -303,12 +257,12 @@ public class OpenWeatherMapConnection {
      * @param excludeDaily if true, will not fetch hourly forecast data from the server
      * @return
      * @throws JsonSyntaxException
-     * @throws OpenWeatherMapCommunicationException
-     * @throws OpenWeatherMapConfigurationException
+     * @throws CommunicationException
+     * @throws ConfigurationException
      */
     public synchronized @Nullable OpenWeatherMapOneCallAPIData getOneCallAPIData(@Nullable PointType location,
             boolean excludeMinutely, boolean excludeHourly, boolean excludeDaily, boolean excludeAlerts)
-            throws JsonSyntaxException, OpenWeatherMapCommunicationException, OpenWeatherMapConfigurationException {
+            throws JsonSyntaxException, CommunicationException, ConfigurationException {
         Map<String, String> params = getRequestParams(handler.getOpenWeatherMapAPIConfig(), location);
         List<String> exclude = new ArrayList<>();
         if (excludeMinutely) {
@@ -327,7 +281,8 @@ public class OpenWeatherMapConnection {
         if (!exclude.isEmpty()) {
             params.put(PARAM_EXCLUDE, exclude.stream().collect(Collectors.joining(",")));
         }
-        return gson.fromJson(getResponseFromCache(buildURL(ONECALL_URL, params)), OpenWeatherMapOneCallAPIData.class);
+        return gson.fromJson(getResponseFromCache(buildURL(buildOneCallURL(), params)),
+                OpenWeatherMapOneCallAPIData.class);
     }
 
     /**
@@ -339,30 +294,29 @@ public class OpenWeatherMapConnection {
      * @param days number of days in the past, relative to the current time.
      * @return
      * @throws JsonSyntaxException
-     * @throws OpenWeatherMapCommunicationException
-     * @throws OpenWeatherMapConfigurationException
+     * @throws CommunicationException
+     * @throws ConfigurationException
      */
     public synchronized @Nullable OpenWeatherMapOneCallHistAPIData getOneCallHistAPIData(@Nullable PointType location,
-            int days)
-            throws JsonSyntaxException, OpenWeatherMapCommunicationException, OpenWeatherMapConfigurationException {
+            int days) throws JsonSyntaxException, CommunicationException, ConfigurationException {
         Map<String, String> params = getRequestParams(handler.getOpenWeatherMapAPIConfig(), location);
         // the API requests the history as timestamp in Unix time format.
         params.put(PARAM_HISTORY_DATE,
                 Long.toString(ZonedDateTime.now(ZoneId.of("UTC")).minusDays(days).toEpochSecond()));
-        return gson.fromJson(getResponseFromCache(buildURL(ONECALL_HISTORY_URL, params)),
+        return gson.fromJson(getResponseFromCache(buildURL(buildOneCallHistoryURL(), params)),
                 OpenWeatherMapOneCallHistAPIData.class);
     }
 
     private Map<String, String> getRequestParams(OpenWeatherMapAPIConfiguration config, @Nullable PointType location) {
         if (location == null) {
-            throw new OpenWeatherMapConfigurationException("@text/offline.conf-error-missing-location");
+            throw new ConfigurationException("@text/offline.conf-error-missing-location");
         }
 
         Map<String, String> params = new HashMap<>();
         // API key (see https://openweathermap.org/appid)
         String apikey = config.apikey;
         if (apikey == null || (apikey = apikey.trim()).isEmpty()) {
-            throw new OpenWeatherMapConfigurationException("@text/offline.conf-error-missing-apikey");
+            throw new ConfigurationException("@text/offline.conf-error-missing-apikey");
         }
         params.put(PARAM_APPID, apikey);
 
@@ -386,16 +340,18 @@ public class OpenWeatherMapConnection {
                 .collect(Collectors.joining("&", url + "?", ""));
     }
 
+    private String buildOneCallURL() {
+        var config = handler.getOpenWeatherMapAPIConfig();
+        return ONECALL_URL + "/" + config.apiVersion + "/" + ONECALL_DATA_SUFFIX_URL;
+    }
+
+    private String buildOneCallHistoryURL() {
+        var config = handler.getOpenWeatherMapAPIConfig();
+        return ONECALL_URL + "/" + config.apiVersion + "/" + ONECALL_HISTORY_SUFFIX_URL;
+    }
+
     private String encodeParam(@Nullable String value) {
-        if (value == null) {
-            return "";
-        }
-        try {
-            return URLEncoder.encode(value, StandardCharsets.UTF_8.name());
-        } catch (UnsupportedEncodingException e) {
-            logger.debug("UnsupportedEncodingException occurred during execution: {}", e.getLocalizedMessage(), e);
-            return "";
-        }
+        return value == null ? "" : URLEncoder.encode(value, StandardCharsets.UTF_8);
     }
 
     private @Nullable String getResponseFromCache(String url) {
@@ -421,26 +377,35 @@ public class OpenWeatherMapConnection {
                 case NOT_FOUND_404:
                     errorMessage = getErrorMessage(content);
                     logger.debug("OpenWeatherMap server responded with status code {}: {}", httpStatus, errorMessage);
-                    throw new OpenWeatherMapConfigurationException(errorMessage);
+                    throw new ConfigurationException(errorMessage);
                 case TOO_MANY_REQUESTS_429:
                     // TODO disable refresh job temporarily (see https://openweathermap.org/appid#Accesslimitation)
                 default:
                     errorMessage = getErrorMessage(content);
                     logger.debug("OpenWeatherMap server responded with status code {}: {}", httpStatus, errorMessage);
-                    throw new OpenWeatherMapCommunicationException(errorMessage);
+                    throw new CommunicationException(errorMessage);
             }
         } catch (ExecutionException e) {
-            String errorMessage = e.getLocalizedMessage();
-            logger.trace("Exception occurred during execution: {}", errorMessage, e);
+            String errorMessage = e.getMessage();
+            logger.debug("ExecutionException occurred during execution: {}", errorMessage, e);
             if (e.getCause() instanceof HttpResponseException) {
                 logger.debug("OpenWeatherMap server responded with status code {}: Invalid API key.", UNAUTHORIZED_401);
-                throw new OpenWeatherMapConfigurationException("@text/offline.conf-error-invalid-apikey", e.getCause());
+                throw new ConfigurationException("@text/offline.conf-error-invalid-apikey", e.getCause());
             } else {
-                throw new OpenWeatherMapCommunicationException(errorMessage, e.getCause());
+                throw new CommunicationException(
+                        errorMessage == null ? "@text/offline.communication-error" : errorMessage, e.getCause());
             }
-        } catch (InterruptedException | TimeoutException e) {
-            logger.debug("Exception occurred during execution: {}", e.getLocalizedMessage(), e);
-            throw new OpenWeatherMapCommunicationException(e.getLocalizedMessage(), e.getCause());
+        } catch (TimeoutException e) {
+            String errorMessage = e.getMessage();
+            logger.debug("TimeoutException occurred during execution: {}", errorMessage, e);
+            throw new CommunicationException(errorMessage == null ? "@text/offline.communication-error" : errorMessage,
+                    e.getCause());
+        } catch (InterruptedException e) {
+            String errorMessage = e.getMessage();
+            logger.debug("InterruptedException occurred during execution: {}", errorMessage, e);
+            Thread.currentThread().interrupt();
+            throw new CommunicationException(errorMessage == null ? "@text/offline.communication-error" : errorMessage,
+                    e.getCause());
         }
     }
 

@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2021 Contributors to the openHAB project
+ * Copyright (c) 2010-2024 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -48,6 +48,8 @@ public class SagerCasterBindingConstants {
     public static final String CHANNEL_WINDEVOLUTION = "wind-evolution";
     public static final String CHANNEL_PRESSURETREND = "pressure-trend";
     public static final String CHANNEL_TEMPERATURETREND = "temperature-trend";
+    public static final String CHANNEL_TIMESTAMP = "timestamp";
+
     // Input channel ids
     public static final String CHANNEL_CLOUDINESS = "cloudiness";
     public static final String CHANNEL_IS_RAINING = "is-raining";
@@ -58,6 +60,6 @@ public class SagerCasterBindingConstants {
     public static final String CHANNEL_WIND_ANGLE = "wind-angle";
 
     // Some algorythms constants
-    public final static String FORECAST_PENDING = "0";
-    public final static Set<String> SHOWERS = Set.of("G", "K", "L", "R", "S", "T", "U", "W");
+    public static final String FORECAST_PENDING = "0";
+    public static final Set<String> SHOWERS = Set.of("G", "K", "L", "R", "S", "T", "U", "W");
 }

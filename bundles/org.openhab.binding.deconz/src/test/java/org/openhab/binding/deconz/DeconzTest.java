@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2021 Contributors to the openHAB project
+ * Copyright (c) 2010-2024 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -60,7 +60,7 @@ import com.google.gson.GsonBuilder;
  * @author Jan N. Klug - Initial contribution
  */
 @ExtendWith(MockitoExtension.class)
-@MockitoSettings(strictness = Strictness.WARN)
+@MockitoSettings(strictness = Strictness.LENIENT)
 @NonNullByDefault
 public class DeconzTest {
     private @NonNullByDefault({}) Gson gson;
@@ -93,6 +93,7 @@ public class DeconzTest {
                 .getBridgeFullState();
         ThingDiscoveryService discoveryService = new ThingDiscoveryService();
         discoveryService.setThingHandler(bridgeHandler);
+        discoveryService.initialize();
         discoveryService.addDiscoveryListener(discoveryListener);
         discoveryService.startScan();
         Mockito.verify(discoveryListener, times(20)).thingDiscovered(any(), any());

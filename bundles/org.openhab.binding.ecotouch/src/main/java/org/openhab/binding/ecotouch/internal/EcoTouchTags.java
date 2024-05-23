@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2021 Contributors to the openHAB project
+ * Copyright (c) 2010-2024 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -22,12 +22,16 @@ import java.util.List;
 
 import javax.measure.Unit;
 
+import org.eclipse.jdt.annotation.NonNullByDefault;
+import org.eclipse.jdt.annotation.Nullable;
+
 /**
  * Represents all valid commands which could be processed by this binding
  *
- * @author Sebastian Held <sebastian.held@gmx.de> - Initial contribution
+ * @author Sebastian Held - Initial contribution
  * @since 1.5.0
  */
+@NonNullByDefault
 public enum EcoTouchTags {
 
     // German: Außentemperatur
@@ -1026,6 +1030,42 @@ public enum EcoTouchTags {
         }
     },
 
+    // German: % Leistungsbegrenzung Min Ausgang
+    TYPE_PRECENT_WATER_LIMIT_MIN {
+        {
+            command = "percent_water_limit_min";
+            unit = PERCENT;
+            tagName = "A172";
+        }
+    },
+
+    // German: % Leistungsbegrenzung Max Ausgang
+    TYPE_PRECENT_WATER_LIMIT_MAX {
+        {
+            command = "percent_water_limit_max";
+            unit = PERCENT;
+            tagName = "A171";
+        }
+    },
+
+    // German: % Heizung Leistungsbegrenzung Min Ausgang
+    TYPE_PRECENT_HEATING_LIMIT_MIN {
+        {
+            command = "percent_heating_limit_min";
+            unit = PERCENT;
+            tagName = "A505";
+        }
+    },
+
+    // German: % Heizung Leistungsbegrenzung Max Ausgang
+    TYPE_PRECENT_HEATING_LIMIT_MAX {
+        {
+            command = "percent_heating_limit_max";
+            unit = PERCENT;
+            tagName = "A504";
+        }
+    },
+
     //
     // The following tags are only available, if an Ecovent System is attached to the Ecotouch
     //
@@ -1131,12 +1171,12 @@ public enum EcoTouchTags {
      * Represents the heatpump command as it will be used in *.items
      * configuration
      */
-    String command;
+    String command = "";
     /**
      * Represents the internal raw heatpump command as it will be used in
      * querying the heat pump
      */
-    String tagName;
+    String tagName = "";
 
     Unit<?> unit = ONE;
 
@@ -1151,7 +1191,7 @@ public enum EcoTouchTags {
         Bitfield,
         Float,
         Enum
-    };
+    }
 
     /**
      * The format of the response of the heat pump
@@ -1172,7 +1212,7 @@ public enum EcoTouchTags {
     /**
      * If \c type is Type.Enum, this defines the meaning of the values (0-based)
      */
-    String[] stringEnum = null;
+    String @Nullable [] stringEnum = null;
 
     /**
      * @return command name (uses in *.items files)
@@ -1244,10 +1284,11 @@ public enum EcoTouchTags {
         if (type == Type.Bitfield) {
             // ignore any scaling from \ref divisor
             int value = raw.intValue();
-            if ((value & (1 << bitnum)) != 0)
+            if ((value & (1 << bitnum)) != 0) {
                 return BigDecimal.ONE;
-            else
+            } else {
                 return BigDecimal.ZERO;
+            }
         }
         BigDecimal result = raw.divide(new BigDecimal(divisor));
         return result;
@@ -1260,8 +1301,8 @@ public enum EcoTouchTags {
      *            command string e.g. "temperature_outside"
      * @return matching EcoTouchTags instance, if available
      */
-    public static EcoTouchTags fromString(String heatpumpCommand) {
-        if ("".equals(heatpumpCommand)) {
+    public static @Nullable EcoTouchTags fromString(String heatpumpCommand) {
+        if (heatpumpCommand.isEmpty()) {
             return null;
         }
         for (EcoTouchTags c : EcoTouchTags.values()) {
@@ -1282,7 +1323,7 @@ public enum EcoTouchTags {
      * @return first matching EcoTouchTags instance, if available
      */
     public static List<EcoTouchTags> fromTag(String tag) {
-        List<EcoTouchTags> result = new LinkedList<EcoTouchTags>();
+        List<EcoTouchTags> result = new LinkedList<>();
         for (EcoTouchTags c : EcoTouchTags.values()) {
             if (c.getTagName().equals(tag)) {
                 result.add(c);
