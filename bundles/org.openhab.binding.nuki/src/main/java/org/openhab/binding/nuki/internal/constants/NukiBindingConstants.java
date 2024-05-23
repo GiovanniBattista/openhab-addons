@@ -35,15 +35,18 @@ public class NukiBindingConstants {
 
     // List of all Thing Type UIDs
     public static final ThingTypeUID THING_TYPE_BRIDGE = new ThingTypeUID(BINDING_ID, "bridge");
+    public static final ThingTypeUID THING_TYPE_WEB_API_BRIDGE = new ThingTypeUID(BINDING_ID, "webApi");
     public static final ThingTypeUID THING_TYPE_SMARTLOCK = new ThingTypeUID(BINDING_ID, "smartlock");
     public static final ThingTypeUID THING_TYPE_OPENER = new ThingTypeUID(BINDING_ID, "opener");
 
     public static final Set<ThingTypeUID> THING_TYPE_BRIDGE_UIDS = Collections.singleton(THING_TYPE_BRIDGE);
+    public static final Set<ThingTypeUID> THING_TYPE_WEB_API_BRIDGE_UIDS = Collections
+            .singleton(THING_TYPE_WEB_API_BRIDGE);
     public static final Set<ThingTypeUID> THING_TYPE_SMARTLOCK_UIDS = Collections.singleton(THING_TYPE_SMARTLOCK);
     public static final Set<ThingTypeUID> THING_TYPE_OPENER_UIDS = Collections.singleton(THING_TYPE_OPENER);
 
-    public static final Set<ThingTypeUID> SUPPORTED_THING_TYPES_UIDS = Stream
-            .of(THING_TYPE_BRIDGE_UIDS, THING_TYPE_SMARTLOCK_UIDS, THING_TYPE_OPENER_UIDS).flatMap(Set::stream)
+    public static final Set<ThingTypeUID> SUPPORTED_THING_TYPES_UIDS = Stream.of(THING_TYPE_BRIDGE_UIDS,
+            THING_TYPE_WEB_API_BRIDGE_UIDS, THING_TYPE_SMARTLOCK_UIDS, THING_TYPE_OPENER_UIDS).flatMap(Set::stream)
             .collect(Collectors.toSet());
 
     // Device Types

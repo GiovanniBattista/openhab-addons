@@ -66,6 +66,6 @@ public class WebApiBridgeDto {
     }
 
     public ThingUID getThingUid() {
-        return new ThingUID(NukiBindingConstants.THING_TYPE_BRIDGE, getBridgeId());
+        return new ThingUID(NukiBindingConstants.THING_TYPE_WEB_API_BRIDGE, getBridgeId());
     }
 }

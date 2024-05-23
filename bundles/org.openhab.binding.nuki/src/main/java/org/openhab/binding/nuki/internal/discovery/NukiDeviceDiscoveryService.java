@@ -21,6 +21,9 @@ import org.openhab.binding.nuki.internal.constants.NukiBindingConstants;
 import org.openhab.binding.nuki.internal.dataexchange.BridgeListResponse;
 import org.openhab.binding.nuki.internal.dto.BridgeApiListDeviceDto;
 import org.openhab.binding.nuki.internal.handler.NukiBridgeHandler;
+import org.openhab.binding.nuki.internal.handler.NukiWebApiBridgeHandler;
+import org.openhab.binding.nuki.internal.webapi.dataexchange.WebApiSmartLockListResponse;
+import org.openhab.binding.nuki.internal.webapi.dto.WebApiSmartLockDevice;
 import org.openhab.core.config.discovery.AbstractDiscoveryService;
 import org.openhab.core.config.discovery.DiscoveryResult;
 import org.openhab.core.config.discovery.DiscoveryResultBuilder;
@@ -41,6 +44,8 @@ public class NukiDeviceDiscoveryService extends AbstractDiscoveryService impleme
     private final Logger logger = LoggerFactory.getLogger(NukiDeviceDiscoveryService.class);
     @Nullable
     private NukiBridgeHandler bridge;
+    @Nullable
+    private NukiWebApiBridgeHandler webApiBridge;
 
     public NukiDeviceDiscoveryService() {
         super(Set.of(NukiBindingConstants.THING_TYPE_SMARTLOCK), 5, false);
@@ -49,23 +54,34 @@ public class NukiDeviceDiscoveryService extends AbstractDiscoveryService impleme
     @Override
     protected void startScan() {
         NukiBridgeHandler bridgeHandler = bridge;
-        if (bridgeHandler == null) {
+        NukiWebApiBridgeHandler webApiBridgeHandler = webApiBridge;
+        if (bridgeHandler == null && webApiBridgeHandler == null) {
             logger.warn("Cannot start Nuki discovery - no bridge available");
             return;
         }
 
         scheduler.execute(() -> {
-            bridgeHandler.withHttpClient(client -> {
-                BridgeListResponse list = client.getList();
-                list.getDevices().stream().map(device -> createDiscoveryResult(device, bridgeHandler))
-                        .flatMap(Optional::stream).forEach(this::thingDiscovered);
-            });
+            if (bridgeHandler != null) {
+                bridgeHandler.withHttpClient(client -> {
+                    BridgeListResponse list = client.getList();
+                    list.getDevices().stream().map(device -> createDiscoveryResult(device, bridgeHandler))
+                            .flatMap(Optional::stream).forEach(this::thingDiscovered);
+                });
+            }
+
+            if (webApiBridgeHandler != null) {
+                webApiBridgeHandler.withHttpClient(client -> {
+                    WebApiSmartLockListResponse response = client.getSmartLocks();
+                    response.getDevices().stream().map(device -> createDiscoveryResult(device, webApiBridgeHandler))
+                            .flatMap(Optional::stream).forEach(this::thingDiscovered);
+                });
+            }
         });
     }
 
     private Optional<DiscoveryResult> createDiscoveryResult(BridgeApiListDeviceDto device,
             NukiBridgeHandler bridgeHandler) {
-        ThingUID uid = getUid(device.getNukiId(), device.getDeviceType(), bridgeHandler);
+        ThingUID uid = getUid(device.getNukiId(), device.getDeviceType(), bridgeHandler.getThing().getUID());
         if (uid == null) {
             logger.warn("Failed to create UID for device '{}' - deviceType '{}' is not supported", device,
                     device.getDeviceType());
@@ -80,16 +96,33 @@ public class NukiDeviceDiscoveryService extends AbstractDiscoveryService impleme
         }
     }
 
+    private Optional<DiscoveryResult> createDiscoveryResult(WebApiSmartLockDevice device,
+            NukiWebApiBridgeHandler bridgeHandler) {
+        ThingUID uid = getUid(Integer.toString(device.getSmartLockId()), device.getType(),
+                bridgeHandler.getThing().getUID());
+        if (uid == null) {
+            logger.warn("Failed to create UID for device '{}' - deviceType '{}' is not supported", device,
+                    device.getType());
+            return Optional.empty();
+        } else {
+            return Optional.of(DiscoveryResultBuilder.create(uid).withBridge(bridgeHandler.getThing().getUID())
+                    .withLabel(device.getName()).withRepresentationProperty(NukiBindingConstants.PROPERTY_NUKI_ID)
+                    .withProperty(NukiBindingConstants.PROPERTY_NAME, device.getName())
+                    .withProperty(NukiBindingConstants.PROPERTY_NUKI_ID, device.getSmartLockId())
+                    .withProperty(NukiBindingConstants.PROPERTY_DEVICE_TYPE, device.getType())
+                    .withProperty(NukiBindingConstants.PROPERTY_FIRMWARE_VERSION, device.getFirmwareVersion()).build());
+        }
+    }
+
     @Nullable
-    private ThingUID getUid(String nukiId, int deviceType, NukiBridgeHandler bridgeHandler) {
+    private ThingUID getUid(String nukiId, int deviceType, ThingUID uid) {
         switch (deviceType) {
             case NukiBindingConstants.DEVICE_OPENER:
-                return new ThingUID(NukiBindingConstants.THING_TYPE_OPENER, bridgeHandler.getThing().getUID(), nukiId);
+                return new ThingUID(NukiBindingConstants.THING_TYPE_OPENER, uid, nukiId);
             case NukiBindingConstants.DEVICE_SMART_LOCK:
             case NukiBindingConstants.DEVICE_SMART_DOOR:
             case NukiBindingConstants.DEVICE_SMART_LOCK_3:
-                return new ThingUID(NukiBindingConstants.THING_TYPE_SMARTLOCK, bridgeHandler.getThing().getUID(),
-                        nukiId);
+                return new ThingUID(NukiBindingConstants.THING_TYPE_SMARTLOCK, uid, nukiId);
             default:
                 return null;
         }

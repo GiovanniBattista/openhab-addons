@@ -21,6 +21,7 @@ import org.openhab.binding.nuki.internal.dataexchange.NukiApiServlet;
 import org.openhab.binding.nuki.internal.handler.NukiBridgeHandler;
 import org.openhab.binding.nuki.internal.handler.NukiOpenerHandler;
 import org.openhab.binding.nuki.internal.handler.NukiSmartLockHandler;
+import org.openhab.binding.nuki.internal.handler.NukiWebApiBridgeHandler;
 import org.openhab.core.id.InstanceUUID;
 import org.openhab.core.io.net.http.HttpClientFactory;
 import org.openhab.core.net.HttpServiceUtil;
@@ -78,6 +79,9 @@ public class NukiHandlerFactory extends BaseThingHandlerFactory {
             NukiBridgeHandler nukiBridgeHandler = new NukiBridgeHandler((Bridge) thing, httpClient, callbackUrl);
             nukiApiServlet.add(nukiBridgeHandler);
             return nukiBridgeHandler;
+        } else if (NukiBindingConstants.THING_TYPE_WEB_API_BRIDGE_UIDS.contains(thingTypeUID)) {
+            NukiWebApiBridgeHandler nukiWebApiBridgeHandler = new NukiWebApiBridgeHandler((Bridge) thing, httpClient);
+            return nukiWebApiBridgeHandler;
         } else if (NukiBindingConstants.THING_TYPE_SMARTLOCK_UIDS.contains(thingTypeUID)) {
             return new NukiSmartLockHandler(thing);
         } else if (NukiBindingConstants.THING_TYPE_OPENER_UIDS.contains(thingTypeUID)) {

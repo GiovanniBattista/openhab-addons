@@ -4,6 +4,27 @@
 	xmlns:thing="https://openhab.org/schemas/thing-description/v1.0.0"
 	xsi:schemaLocation="https://openhab.org/schemas/thing-description/v1.0.0 https://openhab.org/schemas/thing-description-1.0.0.xsd">
 
+	<bridge-type id="webApi">
+		<label>Nuki Web API</label>
+		<description>By using the Nuki Web Api you can control the Smart Lock directly without having to use a bridge (only
+			for supported devices, e.g. Nuki SmartLock 3.0 pro with connected WiFi).</description>
+		<properties>
+			<property name="bridgeId"/>
+			<property name="hardwareId"/>
+			<property name="serverId"/>
+			<property name="firmwareVersion"/>
+			<property name="wifiFirmwareVersion"/>
+		</properties>
+		<config-description>
+			<parameter name="apiToken" type="text" required="true">
+				<label>API Token</label>
+				<context>password</context>
+				<description>The API Token which you configured on Nuki Web
+					(https://developer.nuki.io/t/web-api-authentication/52).</description>
+			</parameter>
+		</config-description>
+	</bridge-type>
+
 	<!-- Nuki Bridge (Bridge Type) -->
 	<bridge-type id="bridge">
 		<label>Nuki Bridge</label>
@@ -64,6 +85,7 @@
 	<thing-type id="smartlock" listed="false">
 		<supported-bridge-type-refs>
 			<bridge-type-ref id="bridge"/>
+			<bridge-type-ref id="webApi"/>
 		</supported-bridge-type-refs>
 		<label>Nuki Smart Lock</label>
 		<description>Nuki Smart Lock which is paired via Bluetooth to a Nuki Bridge.</description>
