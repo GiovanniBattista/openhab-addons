@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2021 Contributors to the openHAB project
+ * Copyright (c) 2010-2024 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -195,7 +195,7 @@ public class ProxmoxNodeHandler extends BaseThingHandler implements ProxmoxStatu
         logger.trace("onStateChanged was called!");
 
         if (System.currentTimeMillis() <= endSkipTime) {
-            logger.debug("Skipping update cycle for id: " + nodeName);
+            logger.debug("Skipping update cycle for id: {}", nodeName);
             return false;
         }
 

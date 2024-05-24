@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2010-2021 Contributors to the openHAB project
+ * Copyright (c) 2010-2024 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -19,6 +19,8 @@ import org.eclipse.jdt.annotation.NonNull;
 import com.google.gson.annotations.SerializedName;
 
 /**
+ * StatusCommand
+ *
  * @author Daniel Zupan - Initial contribution
  */
 public enum StatusCommand {

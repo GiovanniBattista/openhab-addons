@@ -1,3 +1,15 @@
+/**
+ * Copyright (c) 2010-2024 Contributors to the openHAB project
+ *
+ * See the NOTICE file(s) distributed with this work for additional
+ * information.
+ *
+ * This program and the accompanying materials are made available under the
+ * terms of the Eclipse Public License 2.0 which is available at
+ * http://www.eclipse.org/legal/epl-2.0
+ *
+ * SPDX-License-Identifier: EPL-2.0
+ */
 package org.openhab.binding.proxmox.internal.discovery;
 
 import static org.openhab.binding.proxmox.internal.ProxmoxBindingConstants.*;
@@ -28,6 +40,11 @@ import org.openhab.core.thing.binding.ThingHandlerService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * ProxmoxDiscoveryService
+ *
+ * @author Daniel Zupan - Initial contribution
+ */
 @NonNullByDefault
 public class ProxmoxDiscoveryService extends AbstractDiscoveryService implements ThingHandlerService {
 
