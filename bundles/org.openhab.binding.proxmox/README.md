@@ -38,6 +38,7 @@ _If your binding does not offer any generic configurations, you can remove this 
 ## Bridge Configuration
 
 ### Proxmox Configuration
+
 The binding requires a Proxmox user having the following permissions:
 
 ```
