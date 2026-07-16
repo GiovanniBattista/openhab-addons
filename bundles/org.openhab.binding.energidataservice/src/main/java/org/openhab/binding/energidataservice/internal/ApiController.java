@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2025 Contributors to the openHAB project
+ * Copyright (c) 2010-2026 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -14,6 +14,7 @@ package org.openhab.binding.energidataservice.internal;
 
 import static org.openhab.binding.energidataservice.internal.EnergiDataServiceBindingConstants.*;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -46,11 +47,14 @@ import org.openhab.binding.energidataservice.internal.api.dto.CO2EmissionRecord;
 import org.openhab.binding.energidataservice.internal.api.dto.CO2EmissionRecords;
 import org.openhab.binding.energidataservice.internal.api.dto.DatahubPricelistRecord;
 import org.openhab.binding.energidataservice.internal.api.dto.DatahubPricelistRecords;
+import org.openhab.binding.energidataservice.internal.api.dto.DayAheadPriceRecord;
+import org.openhab.binding.energidataservice.internal.api.dto.DayAheadPriceRecords;
 import org.openhab.binding.energidataservice.internal.api.dto.ElspotpriceRecord;
 import org.openhab.binding.energidataservice.internal.api.dto.ElspotpriceRecords;
 import org.openhab.binding.energidataservice.internal.api.serialization.InstantDeserializer;
 import org.openhab.binding.energidataservice.internal.api.serialization.LocalDateTimeDeserializer;
 import org.openhab.binding.energidataservice.internal.exception.DataServiceException;
+import org.openhab.binding.energidataservice.internal.exception.DataServiceRateLimitException;
 import org.openhab.core.i18n.TimeZoneProvider;
 import org.osgi.framework.FrameworkUtil;
 import org.slf4j.Logger;
@@ -139,6 +143,50 @@ public class ApiController {
         }
     }
 
+    /**
+     * Retrieve day-ahead prices for requested area and in requested {@link Currency}.
+     *
+     * @param priceArea Usually DK1 or DK2
+     * @param currency DKK or EUR
+     * @param start Specifies the start point of the period for the data request
+     * @param properties Map of properties which will be updated with metadata from headers
+     * @return Records with pairs of time start and price in requested currency.
+     * @throws InterruptedException
+     * @throws DataServiceException
+     */
+    public DayAheadPriceRecord[] getDayAheadPrices(String priceArea, Currency currency, DateQueryParameter start,
+            DateQueryParameter end, Map<String, String> properties) throws InterruptedException, DataServiceException {
+        if (!SUPPORTED_CURRENCIES.contains(currency)) {
+            throw new IllegalArgumentException("Invalid currency " + currency.getCurrencyCode());
+        }
+
+        Request request = httpClient.newRequest(ENDPOINT + DATASET_PATH + Dataset.DayAheadPrices)
+                .timeout(REQUEST_TIMEOUT_SECONDS, TimeUnit.SECONDS) //
+                .param("start", start.toString()) //
+                .param("filter", "{\"" + FILTER_KEY_PRICE_AREA + "\":\"" + priceArea + "\"}") //
+                .param("columns", "TimeUTC,DayAheadPrice" + currency) //
+                .agent(userAgentSupplier.get()) //
+                .method(HttpMethod.GET);
+
+        if (!end.isEmpty()) {
+            request = request.param("end", end.toString());
+        }
+
+        try {
+            String responseContent = sendRequest(request, properties);
+            DayAheadPriceRecords records = gson.fromJson(responseContent, DayAheadPriceRecords.class);
+            if (records == null || Objects.isNull(records.records())) {
+                throw new DataServiceException("Error parsing response");
+            }
+
+            return Arrays.stream(records.records()).filter(Objects::nonNull).toArray(DayAheadPriceRecord[]::new);
+        } catch (JsonSyntaxException e) {
+            throw new DataServiceException("Error parsing response", e);
+        } catch (TimeoutException | ExecutionException e) {
+            throw new DataServiceException(e);
+        }
+    }
+
     private String getUserAgent() {
         return "openHAB/" + FrameworkUtil.getBundle(this.getClass()).getVersion().toString();
     }
@@ -152,10 +200,34 @@ public class ApiController {
         updatePropertiesFromResponse(response, properties);
 
         int status = response.getStatus();
+        String responseContent = response.getContentAsString();
+
         if (!HttpStatus.isSuccess(status)) {
+            if (logger.isTraceEnabled()) {
+                logger.trace("Request failed with HTTP error {}: {}", status, responseContent);
+                logger.trace("Response headers: {}", response.getHeaders());
+            }
+
+            if (status == HttpStatus.TOO_MANY_REQUESTS_429) {
+                String retryAfter = response.getHeaders().get("Retry-After");
+                if (retryAfter != null) {
+                    try {
+                        int retryAfterSeconds = Integer.parseInt(retryAfter);
+                        if (retryAfterSeconds < 0) {
+                            logger.debug("Invalid Retry-After header value: '{}'", retryAfter);
+                            throw new DataServiceRateLimitException("Rate limit is exceeded");
+                        }
+                        throw new DataServiceRateLimitException(
+                                "Rate limit is exceeded. Retrying after " + retryAfter + " seconds.",
+                                Duration.ofSeconds(retryAfterSeconds));
+                    } catch (NumberFormatException e) {
+                        logger.debug("Invalid Retry-After header value: '{}'", retryAfter);
+                        throw new DataServiceRateLimitException("Rate limit is exceeded", e);
+                    }
+                }
+            }
             throw new DataServiceException("The request failed with HTTP error " + status, status);
         }
-        String responseContent = response.getContentAsString();
         if (responseContent.isEmpty()) {
             throw new DataServiceException("Empty response");
         }

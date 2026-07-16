@@ -11,6 +11,7 @@ import {
     Matter,
     MatterModel,
 } from "@matter/main/model";
+import * as MatterNode from "@matter/node";
 import "@matter/model/resources";
 import fs from "fs";
 import handlebars from "handlebars";
@@ -62,11 +63,17 @@ function toJSON(data: any, space = 2) {
 }
 
 handlebars.registerHelper("asUpperCase", function (str) {
-    return toUpperCase(str);
+    if (str == undefined) {
+        return "UNDEFINED";
+    }
+    return str.toUpperCase();
 });
 
 handlebars.registerHelper("asLowerCase", function (str) {
-    return toLowerCase(str);
+    if (str == undefined) {
+        return "undefined";
+    }
+    return str.toLowerCase();
 });
 
 handlebars.registerHelper("asUpperCamelCase", function (str) {
@@ -78,23 +85,68 @@ handlebars.registerHelper("asLowerCamelCase", function (str) {
 });
 
 handlebars.registerHelper("asTitleCase", function (str) {
-    return toTitleCase(str);
+    if (!str) {
+        return "Undefined";
+    }
+    return str
+        .replace(/([a-z])([A-Z])/g, "$1 $2") // Add a space before uppercase letters that follow lowercase letters
+        .replace(/[_\s]+/g, " ") // Replace underscores or multiple spaces with a single space
+        .trim()
+        .split(" ")
+        .map((word: string) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+        .join(" ");
 });
 
 handlebars.registerHelper("asEnumField", function (str) {
-    return toEnumField(str);
+    // Check if the string starts with a number and prepend "V" if it does
+    if (/^\d/.test(str)) {
+        str = "V" + str;
+    }
+
+    // First split camelCase words by inserting underscores
+    str = str
+        // Split between lowercase and uppercase letters
+        .replace(/([a-z])([A-Z])/g, "$1_$2")
+        // Split between uppercase letters followed by lowercase
+        .replace(/([A-Z])([A-Z][a-z])/g, "$1_$2")
+        // Replace any remaining spaces with underscores
+        .replace(/\s+/g, "_")
+        // Finally convert to uppercase
+        .toUpperCase();
+
+    return str;
 });
 
 handlebars.registerHelper("asUpperSnakeCase", function (str) {
-    return toUpperSnakeCase(str);
+    if (str == undefined) {
+        return "UNDEFINED";
+    }
+    return str
+        .replace(/([a-z])([A-Z])/g, "$1_$2") // Insert underscore between camelCase
+        .replace(/[\s-]+/g, "_") // Replace spaces and hyphens with underscore
+        .toUpperCase();
 });
 
 handlebars.registerHelper("asSpacedTitleCase", function (str) {
-    return toSpacedTitleCase(str);
+    if (!str) {
+        return "Undefined";
+    }
+    return str
+        .replace(/([a-z])([A-Z])/g, "$1 $2") // Add a space before uppercase letters that follow lowercase letters
+        .replace(/([A-Z])([A-Z][a-z])/g, "$1 $2") // Split between capital letters when followed by capital+lowercase
+        .replace(/([a-z])([A-Z][a-z])/g, "$1 $2") // Split between lowercase and camelCase word
+        .replace(/([a-zA-Z])(\d)/g, "$1 $2") // Split between letters and numbers
+        .replace(/(\d)([a-zA-Z])/g, "$1 $2") // Split between numbers and letters
+        .replace(/[_\s]+/g, " ") // Replace underscores or multiple spaces with a single space
+        .trim();
 });
 
 handlebars.registerHelper("asHex", function (decimal, length) {
-    return toHex(decimal, length);
+    let hex = decimal.toString(16).toUpperCase();
+    if (length > 0) {
+        hex = hex.padStart(length, "0");
+    }
+    return `0x${hex}`;
 });
 
 handlebars.registerHelper("isLastElement", function (index: number, count: number) {
@@ -126,27 +178,6 @@ handlebars.registerHelper("isNonNull", function (field) {
     return field.access?.indexOf("RW") > -1 || field.isNonNull;
 });
 
-function toUpperCase(str: string | undefined) {
-    if (str == undefined) {
-        return "UNDEFINED";
-    }
-    return str.toUpperCase();
-}
-
-function toLowerCase(str: string | undefined) {
-    if (str == undefined) {
-        return "undefined";
-    }
-    return str.toLowerCase();
-}
-
-function toUpperCamelCase(str: string | undefined) {
-    if (str == undefined) {
-        return "undefined";
-    }
-    return str.replace(/(^\w|[_\s]\w)/g, match => match.replace(/[_\s]/, "").toUpperCase());
-}
-
 function toLowerCamelCase(str: string): string {
     if (str == undefined) {
         return "undefined";
@@ -156,69 +187,11 @@ function toLowerCamelCase(str: string): string {
     });
 }
 
-function toTitleCase(str: string | undefined): string {
-    if (!str) {
-        return "Undefined";
-    }
-    return str
-        .replace(/([a-z])([A-Z])/g, "$1 $2") // Add a space before uppercase letters that follow lowercase letters
-        .replace(/[_\s]+/g, " ") // Replace underscores or multiple spaces with a single space
-        .trim()
-        .split(" ")
-        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-        .join(" ");
-}
-
-function toEnumField(str: string): string {
-    // Check if the string starts with a number and prepend "V" if it does
-    if (/^\d/.test(str)) {
-        str = "V" + str;
-    }
-
-    // First split camelCase words by inserting underscores
-    str = str
-        // Split between lowercase and uppercase letters
-        .replace(/([a-z])([A-Z])/g, "$1_$2")
-        // Split between uppercase letters followed by lowercase
-        .replace(/([A-Z])([A-Z][a-z])/g, "$1_$2")
-        // Replace any remaining spaces with underscores
-        .replace(/\s+/g, "_")
-        // Finally convert to uppercase
-        .toUpperCase();
-
-    return str;
-}
-
-function toUpperSnakeCase(str: string | undefined) {
+function toUpperCamelCase(str: string | undefined) {
     if (str == undefined) {
-        return "UNDEFINED";
+        return "undefined";
     }
-    return str
-        .replace(/([a-z])([A-Z])/g, "$1_$2") // Insert underscore between camelCase
-        .replace(/[\s-]+/g, "_") // Replace spaces and hyphens with underscore
-        .toUpperCase();
-}
-
-function toSpacedTitleCase(str: string | undefined): string {
-    if (!str) {
-        return "Undefined";
-    }
-    return str
-        .replace(/([a-z])([A-Z])/g, "$1 $2") // Add a space before uppercase letters that follow lowercase letters
-        .replace(/([A-Z])([A-Z][a-z])/g, "$1 $2") // Split between capital letters when followed by capital+lowercase
-        .replace(/([a-z])([A-Z][a-z])/g, "$1 $2") // Split between lowercase and camelCase word
-        .replace(/([a-zA-Z])(\d)/g, "$1 $2") // Split between letters and numbers
-        .replace(/(\d)([a-zA-Z])/g, "$1 $2") // Split between numbers and letters
-        .replace(/[_\s]+/g, " ") // Replace underscores or multiple spaces with a single space
-        .trim();
-}
-
-function toHex(decimal: number, length = 0) {
-    let hex = decimal.toString(16).toUpperCase();
-    if (length > 0) {
-        hex = hex.padStart(length, "0");
-    }
-    return `0x${hex}`;
+    return str.replace(/(^\w|[_\s]\w)/g, match => match.replace(/[_\s]/, "").toUpperCase());
 }
 
 /**
@@ -257,7 +230,7 @@ function matterNativeTypeToJavaNativeType(field: AnyElement) {
             return "date";
         case "string":
         case "locationdesc":
-            return "String";
+            return "Locationdesc";
         case "octstr":
             return "OctetString";
         // this are semantic tag fields
@@ -291,6 +264,12 @@ function filterDep(e: AnyValueElement) {
 }
 
 /**
+ * Shared cluster types registry, populated once before cluster processing.
+ * Maps "OtherCluster.SomeAlias" to a Java primitive
+ */
+const crossClusterTypedefs = new Map<string, string>();
+
+/**
  * Type mapper attempts to lookup the Java native type for any matter element, this include Integers, Strings, Booleans, etc...
  *
  * If there is no matching type, then the matter element is a complex type, like maps, enums and structs
@@ -320,15 +299,25 @@ function typeMapper(mappings: Map<string, string | undefined>, dt: AnyValueEleme
         const ct = dt.children?.[0].type;
         //if the type is cluster.type then its referring to type in another cluster
         if (ct && ct.indexOf(".") > 0) {
-            const [otherCluster, otherType] = ct.split(".");
-            mappedType = `List<${toUpperCamelCase(otherCluster + "Cluster")}.${toUpperCamelCase(otherType)}>`;
+            const resolved = crossClusterTypedefs.get(ct);
+            if (resolved) {
+                mappedType = `List<${resolved}>`;
+            } else {
+                const [otherCluster, otherType] = ct.split(".");
+                mappedType = `List<${toUpperCamelCase(otherCluster + "Cluster")}.${toUpperCamelCase(otherType)}>`;
+            }
         } else {
             mappedType = `List<${toUpperCamelCase((ct && mappings.get(ct)) || ct)}>`;
         }
     } else if (mappedType && mappedType.indexOf(".") > 0) {
-        //some types reference other clusters, like MediaPlayback.CharacteristicEnum
-        const [cName, dtName] = mappedType.split(".");
-        mappedType = `${toUpperCamelCase(cName)}Cluster.${toUpperCamelCase(dtName)}`;
+        const resolved = crossClusterTypedefs.get(mappedType);
+        if (resolved) {
+            mappedType = resolved;
+        } else {
+            //some types reference other clusters, like MediaPlayback.CharacteristicEnum
+            const [cName, dtName] = mappedType.split(".");
+            mappedType = `${toUpperCamelCase(cName)}Cluster.${toUpperCamelCase(dtName)}`;
+        }
     } else if (mappings.get(mappedType)) {
         //if the type is already mapped, then use the mapped type
         mappedType = mappings.get(mappedType);
@@ -356,6 +345,19 @@ const globalDataTypes = (matterData.children as DatatypeElement[]).filter(c => c
 const globalAttributes = (matterData.children as AttributeElement[]).filter(c => c.tag === "attribute");
 
 /**
+ * Global cluster attributes that should be in BaseCluster, not individual clusters
+ * These are defined in the Matter spec as mandatory for all clusters
+ * Note: FeatureMap is NOT included here because each cluster has its own specific FeatureMap bitmap structure
+ */
+const globalClusterAttributeNames = new Set([
+    "ClusterRevision",
+    "AttributeList",
+    "EventList",
+    "AcceptedCommandList",
+    "GeneratedCommandList"
+]);
+
+/**
  * Global type mapping lookup, clusters will combine this with their own mapping
  */
 const globalTypeMapping = new Map();
@@ -366,7 +368,15 @@ globalTypeMapping.set("namespace", "Integer");
 globalTypeMapping.set("tag", "Integer");
 
 globalDataTypes.forEach(dt => {
-    matterNativeTypeToJavaNativeType(dt) && globalTypeMapping.set(dt.name, matterNativeTypeToJavaNativeType(dt));
+    const javaType = matterNativeTypeToJavaNativeType(dt);
+    if (javaType) {
+        globalTypeMapping.set(dt.name, javaType);
+    } else if (dt.type === "struct" || dt.type?.startsWith("enum") || dt.type?.startsWith("map")) {
+        // Global enum/struct/bitmap datatypes are emitted as inner classes on BaseCluster.
+        // Subclasses inherit these, so reference them by their camel cased class name
+        // (e.g. field `type: "currency"` -->  Java type `Currency`).
+        globalTypeMapping.set(dt.name, toUpperCamelCase(dt.name));
+    }
 });
 //it seems like there is a global data type that overrides the string type
 globalTypeMapping.set("string", "String");
@@ -374,6 +384,23 @@ globalTypeMapping.set("string", "String");
 globalAttributes.forEach(
     dt => matterNativeTypeToJavaNativeType(dt) && globalTypeMapping.set(dt.name, matterNativeTypeToJavaNativeType(dt)),
 );
+
+// walk every cluster's `datatype` children and register scalar typedef aliases
+// (e.g. "CameraAvStreamManagement.VideoStreamID" --> "Integer") in the cluster registry.
+// Done once before per cluster processing so typeMapper can resolve luster references
+// to primitives without depending on the order clusters are visited in.
+(matterData.children as ClusterElement[])
+    .filter(c => c.tag === "cluster")
+    .forEach(cluster => {
+        (cluster.children || [])
+            .filter(c => c.tag === "datatype")
+            .forEach(dt => {
+                const javaType = matterNativeTypeToJavaNativeType(dt as AnyElement);
+                if (javaType) {
+                    crossClusterTypedefs.set(`${cluster.name}.${dt.name}`, javaType);
+                }
+            });
+    });
 
 const clusters: ExtendedClusterElement[] =
     (matterData.children as ClusterElement[])
@@ -383,11 +410,9 @@ const clusters: ExtendedClusterElement[] =
             // typeMapping is a map of matter types to Java types
             const typeMapping = new Map<string, string | undefined>(globalTypeMapping);
             const dataTypes = (cluster.children || []).filter(c => c.tag === "datatype") as DatatypeElement[];
-            const maps = (cluster.children || []).filter(c => c.type?.startsWith("map")) as AnyValueElement[];
-            const enums = (cluster.children || []).filter(c => c.type?.startsWith("enum")) as AnyValueElement[];
-            const structs = (cluster.children || [])
-                .filter(dt => dt.type === "struct" || dt.tag === "event")
-                .map(dt => typeMapper(typeMapping, dt as AnyValueElement));
+
+            // Register cluster local datatypes (typedef aliases) BEFORE processing structs/attributes/commands
+            // so subsequent typeMapper calls can resolve cluster local scalar aliases (e.g. VideoStreamID --> Integer).
             dataTypes?.forEach(dt => {
                 if (dt.type && dt.type.indexOf(".") > 0) {
                     return typeMapping.set(dt.name, dt.type);
@@ -398,12 +423,22 @@ const clusters: ExtendedClusterElement[] =
                 );
             });
 
+            const maps = (cluster.children || []).filter(c => c.type?.startsWith("map")) as AnyValueElement[];
+            const enums = (cluster.children || []).filter(c => c.type?.startsWith("enum")) as AnyValueElement[];
+            const structs = (cluster.children || [])
+                .filter(dt => dt.type === "struct" || dt.tag === "event")
+                .map(dt => typeMapper(typeMapping, dt as AnyValueElement));
+
             // if the cluster has a type, then the java class will extend this type (which is another cluster)
             const parent = cluster.type ? matterData.children.find(c => c.name == cluster.type) : undefined;
 
             const attributes = cluster.children
                 ?.filter(c => c.tag == "attribute")
                 ?.filter((element, index, self) => {
+                    // Filter out global cluster attributes (they're in BaseCluster)
+                    if (globalClusterAttributeNames.has(element.name)) {
+                        return false;
+                    }
                     //remove duplicates, not sure why they exist in the model
                     const dupIndex = self.findIndex(e => e.name === element.name);
                     if (dupIndex != index) {
@@ -527,17 +562,21 @@ clusters.forEach(cluster => {
     });
 });
 
-// Compile Handlebars template
+// Use `noEscape` so `{{...}}` does not HTML-encode values
+const templateOptions: Parameters<typeof handlebars.compile>[1] = { noEscape: true };
 const clusterSource = fs.readFileSync("src/templates/cluster-class.java.hbs", "utf8");
-const clusterTemplate = handlebars.compile(clusterSource);
+const clusterTemplate = handlebars.compile(clusterSource, templateOptions);
 const baseClusterSource = fs.readFileSync("src/templates/base-cluster.java.hbs", "utf8");
-const baseClusterTemplate = handlebars.compile(baseClusterSource);
+const baseClusterTemplate = handlebars.compile(baseClusterSource, templateOptions);
 const deviceTypeSource = fs.readFileSync("src/templates/device-types-class.java.hbs", "utf8");
-const deviceTypeTemplate = handlebars.compile(deviceTypeSource);
+const deviceTypeTemplate = handlebars.compile(deviceTypeSource, templateOptions);
 const clusterRegistrySource = fs.readFileSync("src/templates/cluster-registry.java.hbs", "utf8");
-const clusterRegistryTemplate = handlebars.compile(clusterRegistrySource);
+const clusterRegistryTemplate = handlebars.compile(clusterRegistrySource, templateOptions);
 const clusterConstantsSource = fs.readFileSync("src/templates/cluster-constants.java.hbs", "utf8");
-const clusterConstantsTemplate = handlebars.compile(clusterConstantsSource);
+const clusterConstantsTemplate = handlebars.compile(clusterConstantsSource, templateOptions);
+const semanticTagsSource = fs.readFileSync("src/templates/semantic-tags-class.java.hbs", "utf8");
+const semanticTagsTemplate = handlebars.compile(semanticTagsSource, templateOptions);
+
 
 // Generate Java code
 
@@ -558,7 +597,25 @@ const datatypes = {
 
 fs.mkdir("out", { recursive: true }, err => {});
 
-const baseClusterClass = baseClusterTemplate(datatypes);
+// Prepare global cluster attributes for BaseCluster
+const globalClusterAttributes = globalAttributes
+    .filter(attr => globalClusterAttributeNames.has(attr.name))
+    .map(attr => {
+        const mapped = typeMapper(globalTypeMapping, attr);
+        // EventList is deprecated but should still be List<Integer>
+        if (attr.name === "EventList") {
+            return {
+                ...mapped,
+                mappedType: "List<Integer>",
+            };
+        }
+        return mapped;
+    });
+
+const baseClusterClass = baseClusterTemplate({
+    ...datatypes,
+    globalAttributes: globalClusterAttributes,
+});
 fs.writeFileSync(`out/BaseCluster.java`, baseClusterClass);
 
 const deviceTypeClass = deviceTypeTemplate({
@@ -566,13 +623,126 @@ const deviceTypeClass = deviceTypeTemplate({
 });
 fs.writeFileSync(`out/DeviceTypes.java`, deviceTypeClass);
 
-const clusterRegistryClass = clusterRegistryTemplate({ clusters: clusters });
-fs.writeFileSync(`out/ClusterRegistry.java`, clusterRegistryClass);
+// We'll write ClusterRegistry and ClusterConstants after inheritance merging so they reflect the final definitions.
+//
+// After clusters array is initially built (`const clusters: ExtendedClusterElement[] = ...`) we need to merge any clusters
+// that specify a `type` (i.e. they inherit from another cluster) with their parent cluster.
+// The child cluster should override any definitions from the parent.  We also keep the parent
+// cluster in the array so that other children can still inherit from it if necessary, but we will skip emitting any
+// Java source for clusters that don't have a `CLUSTER_ID` (the abstract parent definitions).
 
-const clusterConstantsClass = clusterConstantsTemplate({ clusters: clusters });
-fs.writeFileSync(`out/ClusterConstants.java`, clusterConstantsClass);
+// Helper to merge two lists of schema objects (attributes, commands, etc.) where the child overrides the parent on
+// duplicate `name` values.
+function mergeLists<T extends { name: string }>(parentList: T[] | undefined, childList: T[] | undefined): T[] {
+    const merged: T[] = [];
+    const pushOrReplace = (item: T) => {
+        const idx = merged.findIndex(i => i.name === item.name);
+        if (idx >= 0) {
+            merged[idx] = item; // child overrides parent
+        } else {
+            merged.push(item);
+        }
+    };
+    parentList?.forEach(pushOrReplace);
+    childList?.forEach(pushOrReplace);
+    return merged;
+}
 
+// Build a quick lookup map from cluster name to instance for recursive merging.
+const clusterLookup = new Map<string, ExtendedClusterElement>();
+clusters.forEach(c => clusterLookup.set(c.name, c));
+
+// Recursively merge parent definitions into the child cluster.  The `type` property is cleared afterwards so the
+// templating logic always extends `BaseCluster`.
+function resolveInheritance(cluster: ExtendedClusterElement, seen: Set<string> = new Set()): void {
+    if (!cluster.type) {
+        return; // no parent
+    }
+    if (seen.has(cluster.name)) {
+        // circular reference guard (should never happen in the Matter model)
+        return;
+    }
+    seen.add(cluster.name);
+    const parent = clusterLookup.get(cluster.type);
+    if (!parent) {
+        return; // parent not found – leave as-is; the template will still extend BaseCluster
+    }
+
+    // Ensure parent is resolved first (support multi-level inheritance)
+    resolveInheritance(parent, seen);
+
+    // Merge lists – parent first, then child overrides duplicates
+    cluster.attributes = mergeLists(parent.attributes, cluster.attributes);
+    cluster.commands = mergeLists(parent.commands, cluster.commands);
+    cluster.enums = mergeLists(parent.enums, cluster.enums);
+    cluster.structs = mergeLists(parent.structs, cluster.structs);
+    cluster.maps = mergeLists(parent.maps, cluster.maps);
+    cluster.datatypes = mergeLists(parent.datatypes, cluster.datatypes);
+
+    // Merge low-level children array that some templates rely on
+    cluster.children = mergeLists(parent.children as any, cluster.children as any);
+
+    // Merge type mapping – child entries should override parent entries
+    cluster.typeMapping = new Map([...parent.typeMapping, ...cluster.typeMapping]);
+
+    // Clear the `type` so the template does not generate an "extends ParentCluster"
+    // and instead always extends BaseCluster.
+    delete (cluster as any).type;
+}
+
+// Apply the merge for every cluster that specifies a parent type.
+clusters.forEach(c => resolveInheritance(c));
+
+// Write out the clusters
 clusters.forEach(cluster => {
     const javaCode = clusterTemplate(cluster);
     fs.writeFileSync(`out/${cluster.name}Cluster.java`, javaCode);
 });
+
+// Generate ClusterRegistry and ClusterConstants using the merged cluster data. Note that they can still reference
+// clusters without IDs (e.g. abstract definitions), but the templates themselves guard against missing IDs where
+// appropriate.
+
+const concreteClusters = clusters.filter(c => c.id !== undefined && c.id !== null);
+
+const clusterRegistryClass = clusterRegistryTemplate({ clusters: concreteClusters });
+fs.writeFileSync(`out/ClusterRegistry.java`, clusterRegistryClass);
+
+const clusterConstantsClass = clusterConstantsTemplate({ clusters: concreteClusters });
+fs.writeFileSync(`out/ClusterConstants.java`, clusterConstantsClass);
+
+// Build namespace to tags structure expected by the template
+const namespaces = Object.entries(MatterNode)
+    .filter(([name]) => name.endsWith("Tag"))
+    .map(([rawName, tagDefs]: [string, any]) => {
+        // Derive a clean namespace identifier (e.g. "Area" from "AreaNamespaceTag")
+        let namespace = rawName;
+        if (namespace.endsWith("NamespaceTag")) {
+            namespace = namespace.substring(0, namespace.length - "NamespaceTag".length);
+        } else if (namespace.endsWith("Tag")) {
+            namespace = namespace.substring(0, namespace.length - "Tag".length);
+        }
+
+        // Convert the tag definition object into an array understood by the template
+        const tagEntries = Object.entries(tagDefs).map(([tagName, info]: [string, any]) => ({
+            name: tagName,
+            id: info.tag,
+            label: info.label,
+        }));
+
+        // All tags in a namespace share the same namespaceId, so read it from the first tag
+        const firstTagKey = Object.keys(tagDefs)[0];
+        const namespaceId = firstTagKey ? tagDefs[firstTagKey].namespaceId : undefined;
+
+        return {
+            namespace,
+            id: namespaceId,
+            tags: tagEntries,
+        };
+    });
+
+// Generate NamespaceTags.java using the prepared structure
+const semanticTagsClass = semanticTagsTemplate({ namespaces });
+fs.writeFileSync(`out/SemanticTags.java`, semanticTagsClass);
+
+

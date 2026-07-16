@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2010-2025 Contributors to the openHAB project
+ * Copyright (c) 2010-2026 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -92,7 +92,7 @@ public abstract class BroadlinkRemoteHandler extends BroadlinkBaseThingHandler {
         return sendCommand(commandByte, new byte[0], purpose);
     }
 
-    private byte @Nullable [] sendCommand(byte commandByte, byte[] codeBytes, String purpose) {
+    protected byte @Nullable [] sendCommand(byte commandByte, byte[] codeBytes, String purpose) {
         try {
             ByteArrayOutputStream outputStream = buildCommandMessage(commandByte, codeBytes);
             byte[] padded = Utils.padTo(outputStream.toByteArray(), 16);
@@ -146,15 +146,13 @@ public abstract class BroadlinkRemoteHandler extends BroadlinkBaseThingHandler {
                 return;
             }
 
-            updateState(BroadlinkBindingConstants.LEARNING_CONTROL_CHANNEL,
-                    new StringType(message + irCommand + "..."));
-
             byte[] response = sendCommand(COMMAND_BYTE_CHECK_LEARNT_DATA, "send learnt code check command");
 
             if (response == null) {
                 logger.warn("Got nothing back while getting learnt code");
                 updateState(BroadlinkBindingConstants.LEARNING_CONTROL_CHANNEL, new StringType("NULL"));
             } else {
+                logger.debug("Received response with length {}", response.length);
                 String hexString = Utils.toHexString(extractResponsePayload(response));
                 String cmdLabel = null;
                 if (replacement) {
@@ -181,7 +179,7 @@ public abstract class BroadlinkRemoteHandler extends BroadlinkBaseThingHandler {
                 }
             }
         } catch (IOException e) {
-            logger.warn("Exception while attempting to check learnt code: {}", e.getMessage());
+            logger.warn("Exception while attempting to check learnt code: {}", e.getMessage(), e);
             updateState(BroadlinkBindingConstants.LEARNING_CONTROL_CHANNEL, new StringType("NULL"));
         }
     }
@@ -209,6 +207,8 @@ public abstract class BroadlinkRemoteHandler extends BroadlinkBaseThingHandler {
                 updateState(BroadlinkBindingConstants.LEARNING_CONTROL_CHANNEL,
                         new StringType(BroadlinkBindingConstants.LEARNING_CONTROL_COMMAND_LEARN));
                 sendCommand(COMMAND_BYTE_ENTER_LEARNING, "enter remote code learning mode");
+                updateState(BroadlinkBindingConstants.LEARNING_CONTROL_CHANNEL,
+                        new StringType(BroadlinkBindingConstants.LEARNING_CONTROL_COMMAND_LEARN + " done"));
                 break;
             }
             case BroadlinkBindingConstants.LEARNING_CONTROL_COMMAND_CHECK: {
@@ -288,11 +288,11 @@ public abstract class BroadlinkRemoteHandler extends BroadlinkBaseThingHandler {
                         break;
                     }
                     default: {
-                        logger.debug("Thing {} has unknown channel type '{}'", getThing().getLabel(),
-                                channelTypeUID.getId());
+                        logger.debug("Thing {} has unknown RF learning command '{}'", getThing().getLabel(), command);
                         break;
                     }
                 }
+                break;
             }
             default:
                 logger.debug("Thing {} has unknown channel type '{}'", getThing().getLabel(), channelTypeUID.getId());
@@ -371,7 +371,7 @@ public abstract class BroadlinkRemoteHandler extends BroadlinkBaseThingHandler {
         HexFormat hex = HexFormat.of();
 
         try {
-            while ((System.currentTimeMillis() < timeout) && (freqFound)) {
+            while ((System.currentTimeMillis() < timeout) && (!freqFound)) {
                 TimeUnit.MILLISECONDS.sleep(500);
                 logger.trace("Checking rf frequency");
                 byte[] resp = (sendCommand(COMMAND_BYTE_CHECK_RF_FREQ_LEARNING, "check rf frequency"));
@@ -384,12 +384,16 @@ public abstract class BroadlinkRemoteHandler extends BroadlinkBaseThingHandler {
                     }
                 }
             }
-        } catch (IOException | InterruptedException e) {
-            logger.warn("RF learning unexpected interrupted:{}", e.getMessage());
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            logger.warn("RF learning interrupted: {}", e.getMessage());
+            freqFound = false;
+        } catch (IOException e) {
+            logger.warn("RF learning unexpected interrupted: {}", e.getMessage());
             freqFound = false;
         }
 
-        if (freqFound) {
+        if (!freqFound) {
             sendCommand(COMMAND_BYTE_EXIT_RF_FREQ_LEARNING, "exit remote rf frequency learning mode");
             logger.info("No RF frequency found.");
             updateState(BroadlinkBindingConstants.RF_LEARNING_CONTROL_CHANNEL, new StringType("NULL"));
