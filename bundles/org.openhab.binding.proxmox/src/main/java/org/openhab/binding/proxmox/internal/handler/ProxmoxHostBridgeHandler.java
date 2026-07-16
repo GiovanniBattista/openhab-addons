@@ -1,4 +1,4 @@
-/*
+/**
  * Copyright (c) 2010-2025 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
@@ -63,8 +63,8 @@ public class ProxmoxHostBridgeHandler extends BaseBridgeHandler {
     private static final int WOL_PACKET_RETRY_COUNT = 10;
     private static final int WOL_PACKET_RETRY_DELAY_MILLIS = 100;
 
-    private ProxmoxHostConfiguration config;
-    private ProxmoxVEApi api;
+    private volatile ProxmoxHostConfiguration config;
+    private volatile ProxmoxVEApi api;
     private HttpClient httpClient;
 
     private final Map<String, ProxmoxNode> lastNodeStates = new ConcurrentHashMap<>();
@@ -109,6 +109,7 @@ public class ProxmoxHostBridgeHandler extends BaseBridgeHandler {
         } catch (MalformedURLException ex) {
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR,
                     "Invalid base url: " + ex.getMessage());
+            return;
         }
 
         if (config.getUsername() == null || config.getUsername().isEmpty()) {
@@ -146,8 +147,8 @@ public class ProxmoxHostBridgeHandler extends BaseBridgeHandler {
         if (job == null || job.isCancelled()) {
             long pollingInterval = config.getPollingInterval();
             if (pollingInterval < 1) {
-                pollingInterval = TimeUnit.SECONDS.toSeconds(30);
-                logger.warn("Wrong configuraiton value for polling interval. Using default value: {}s",
+                pollingInterval = 30;
+                logger.warn("Wrong configuration value for polling interval. Using default value: {}s",
                         pollingInterval);
             }
             proxmoxPollingJob = scheduler.scheduleWithFixedDelay(proxmoxApiPoller, 3, pollingInterval,
@@ -159,13 +160,13 @@ public class ProxmoxHostBridgeHandler extends BaseBridgeHandler {
         ScheduledFuture<?> pollingJob = proxmoxPollingJob;
         if (pollingJob != null && !pollingJob.isDone()) {
             pollingJob.cancel(true);
-            pollingJob = null;
         }
+        proxmoxPollingJob = null;
     }
 
     @Override
     public void handleCommand(ChannelUID channelUID, Command command) {
-        throw new IllegalStateException("This thing does not support any commands");
+        logger.debug("Bridge does not support commands. Ignoring command '{}' for channel '{}'.", command, channelUID);
     }
 
     @Override
@@ -255,6 +256,36 @@ public class ProxmoxHostBridgeHandler extends BaseBridgeHandler {
                     discovery.removeDiscoveredNode(node);
                 }
             });
+
+            // the remaining VMs in lastVmStatesCopy were not handled, thus have to be removed
+            lastVmStatesCopy.forEach((id, vm) -> {
+                logger.trace("VM '{}' removed.", id);
+                lastVmStates.remove(id);
+
+                ProxmoxStatusChangedListener<ProxmoxVm> statusListener = vmStatusListeners.get(id);
+                if (statusListener != null) {
+                    statusListener.onRemoved();
+                }
+
+                if (discovery != null && vm != null) {
+                    discovery.removeDiscoveredVM(vm);
+                }
+            });
+
+            // the remaining LXCs in lastLxcStatesCopy were not handled, thus have to be removed
+            lastLxcStatesCopy.forEach((id, lxc) -> {
+                logger.trace("LXC '{}' removed.", id);
+                lastLxcStates.remove(id);
+
+                ProxmoxStatusChangedListener<ProxmoxLxc> statusListener = lxcStatusListeners.get(id);
+                if (statusListener != null) {
+                    statusListener.onRemoved();
+                }
+
+                if (discovery != null && lxc != null) {
+                    discovery.removeDiscoveredLxc(lxc);
+                }
+            });
         }
 
         private void fetchstatusUpdates4VMs(ProxmoxNode node, Map<String, ProxmoxVm> lastVMStatesCopy)
@@ -281,21 +312,6 @@ public class ProxmoxHostBridgeHandler extends BaseBridgeHandler {
                 // VM was handled, so remove it from the copy (if this node exists)
                 lastVMStatesCopy.remove(id);
             }
-
-            // the remaining VMs in lastVMStatesCopy were not handled, thus have to be removed
-            lastVMStatesCopy.forEach((id, vm) -> {
-                logger.trace("VM '{}' removed.", id);
-                lastVmStates.remove(id);
-
-                ProxmoxStatusChangedListener<ProxmoxVm> statusListener = vmStatusListeners.get(id);
-                if (statusListener != null) {
-                    statusListener.onRemoved();
-                }
-
-                if (discovery != null && node != null) {
-                    discovery.removeDiscoveredVM(vm);
-                }
-            });
         }
 
         private void fetchStatusUpdates4LXCs(ProxmoxNode node, Map<String, ProxmoxLxc> lastLxcStatesCopy)
@@ -309,7 +325,7 @@ public class ProxmoxHostBridgeHandler extends BaseBridgeHandler {
                 if (lxcStatusListener == null) {
                     logger.trace("LXC '{}' was added", id);
 
-                    if (discovery != null && !lastLxcStates.containsKey(id)) {
+                    if (discovery != null && !lastLxcStatesCopy.containsKey(id)) {
                         discovery.notifyLxcDiscovered(lxc, node);
                     }
 
@@ -322,21 +338,6 @@ public class ProxmoxHostBridgeHandler extends BaseBridgeHandler {
                 // LXC was handled, so remove it from the copy (if this node exists)
                 lastLxcStatesCopy.remove(id);
             }
-
-            // the remaining LXCs in lastLxcStatesCopy were not handled, thus have to be removed
-            lastLxcStatesCopy.forEach((id, lxc) -> {
-                logger.trace("LXC '{}' remove", id);
-                lastLxcStates.remove(id);
-
-                ProxmoxStatusChangedListener<ProxmoxLxc> statusListener = lxcStatusListeners.get(id);
-                if (statusListener != null) {
-                    statusListener.onRemoved();
-                }
-
-                if (discovery != null && node != null) {
-                    discovery.removeDiscoveredLxc(lxc);
-                }
-            });
         }
     };
 

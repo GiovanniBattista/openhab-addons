@@ -1,4 +1,4 @@
-/*
+/**
  * Copyright (c) 2010-2025 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
@@ -56,8 +56,6 @@ public class ProxmoxDiscoveryService extends AbstractDiscoveryService implements
 
     private final Logger logger = LoggerFactory.getLogger(ProxmoxDiscoveryService.class);
 
-    // private ScheduledFuture<?> discoveryFuture;
-
     private @Nullable ProxmoxHostBridgeHandler bridgeHandler;
 
     public ProxmoxDiscoveryService() {
@@ -66,19 +64,20 @@ public class ProxmoxDiscoveryService extends AbstractDiscoveryService implements
 
     @Override
     protected void startScan() {
-        if (bridgeHandler.getThing().getStatus() != ThingStatus.ONLINE) {
-            return; // bridge not initialized yet so return here
+        ProxmoxHostBridgeHandler handler = bridgeHandler;
+        if (handler == null || handler.getThing().getStatus() != ThingStatus.ONLINE) {
+            return;
         }
 
-        List<ProxmoxNode> nodes = discoverNodes();
-        discoverVMs(nodes);
-        discoverLXCs(nodes);
+        List<ProxmoxNode> nodes = discoverNodes(handler);
+        discoverVMs(handler, nodes);
+        discoverLXCs(handler, nodes);
     }
 
-    private List<ProxmoxNode> discoverNodes() {
+    private List<ProxmoxNode> discoverNodes(ProxmoxHostBridgeHandler handler) {
         List<ProxmoxNode> nodes = Collections.emptyList();
         try {
-            nodes = bridgeHandler.getApi().getNodes();
+            nodes = handler.getApi().getNodes();
             for (ProxmoxNode node : nodes) {
                 notifyNodeDiscovered(node);
             }
@@ -89,7 +88,12 @@ public class ProxmoxDiscoveryService extends AbstractDiscoveryService implements
     }
 
     public void notifyNodeDiscovered(ProxmoxNode node) {
-        ThingUID bridgeUID = bridgeHandler.getThing().getUID();
+        ProxmoxHostBridgeHandler handler = bridgeHandler;
+        if (handler == null) {
+            return;
+        }
+
+        ThingUID bridgeUID = handler.getThing().getUID();
         ThingUID uid = new ThingUID(ProxmoxBindingConstants.THING_TYPE_NODE, bridgeUID, node.getNode());
 
         Map<String, Object> properties = new HashMap<>();
@@ -105,28 +109,41 @@ public class ProxmoxDiscoveryService extends AbstractDiscoveryService implements
     }
 
     public void removeDiscoveredNode(ProxmoxNode node) {
-        throw new UnsupportedOperationException("Not yet implemented!");
+        ProxmoxHostBridgeHandler handler = bridgeHandler;
+        if (handler == null) {
+            return;
+        }
+
+        ThingUID bridgeUID = handler.getThing().getUID();
+        ThingUID uid = new ThingUID(ProxmoxBindingConstants.THING_TYPE_NODE, bridgeUID, node.getNode());
+        thingRemoved(uid);
+
+        logger.debug("Removed discovered node '{}'", node.getNode());
     }
 
-    private void discoverVMs(List<ProxmoxNode> nodes) {
+    private void discoverVMs(ProxmoxHostBridgeHandler handler, List<ProxmoxNode> nodes) {
         for (ProxmoxNode node : nodes) {
             try {
-                List<ProxmoxVm> vms = bridgeHandler.getApi().getVMs(node);
+                List<ProxmoxVm> vms = handler.getApi().getVMs(node);
 
                 for (ProxmoxVm vm : vms) {
                     notifyVmDiscovered(vm, node);
                 }
             } catch (ProxmoxApiCommunicationException | ProxmoxApiConfigurationException e) {
-                logger.debug("Could not disover vms: {}", e.getMessage(), e);
+                logger.debug("Could not discover vms: {}", e.getMessage(), e);
             }
         }
     }
 
     public void notifyVmDiscovered(ProxmoxVm vm, ProxmoxNode node) {
+        ProxmoxHostBridgeHandler handler = bridgeHandler;
+        if (handler == null) {
+            return;
+        }
 
         String vmId = vm.getVmid();
 
-        ThingUID bridgeUID = bridgeHandler.getThing().getUID();
+        ThingUID bridgeUID = handler.getThing().getUID();
         ThingUID uid = new ThingUID(ProxmoxBindingConstants.THING_TYPE_VM, bridgeUID, vmId);
 
         Map<String, Object> properties = new HashMap<>();
@@ -142,28 +159,41 @@ public class ProxmoxDiscoveryService extends AbstractDiscoveryService implements
     }
 
     public void removeDiscoveredVM(ProxmoxVm vm) {
-        throw new UnsupportedOperationException("Not yet implemented!");
+        ProxmoxHostBridgeHandler handler = bridgeHandler;
+        if (handler == null) {
+            return;
+        }
+
+        ThingUID bridgeUID = handler.getThing().getUID();
+        ThingUID uid = new ThingUID(ProxmoxBindingConstants.THING_TYPE_VM, bridgeUID, vm.getVmid());
+        thingRemoved(uid);
+
+        logger.debug("Removed discovered VM '{}' with id '{}'", vm.getName(), vm.getVmid());
     }
 
-    private void discoverLXCs(List<ProxmoxNode> nodes) {
+    private void discoverLXCs(ProxmoxHostBridgeHandler handler, List<ProxmoxNode> nodes) {
         for (ProxmoxNode node : nodes) {
             try {
-                List<ProxmoxLxc> lxcs = bridgeHandler.getApi().getLXCs(node);
+                List<ProxmoxLxc> lxcs = handler.getApi().getLXCs(node);
 
                 for (ProxmoxLxc lxc : lxcs) {
                     notifyLxcDiscovered(lxc, node);
                 }
             } catch (ProxmoxApiCommunicationException | ProxmoxApiConfigurationException e) {
-                logger.debug("Could not disover lxcs: {}", e.getMessage(), e);
+                logger.debug("Could not discover lxcs: {}", e.getMessage(), e);
             }
         }
     }
 
     public void notifyLxcDiscovered(ProxmoxLxc lxc, ProxmoxNode node) {
+        ProxmoxHostBridgeHandler handler = bridgeHandler;
+        if (handler == null) {
+            return;
+        }
 
         String lxcId = lxc.getLxcId();
 
-        ThingUID bridgeUID = bridgeHandler.getThing().getUID();
+        ThingUID bridgeUID = handler.getThing().getUID();
         ThingUID uid = new ThingUID(ProxmoxBindingConstants.THING_TYPE_LXC, bridgeUID, lxcId);
 
         Map<String, Object> properties = new HashMap<>();
@@ -175,11 +205,20 @@ public class ProxmoxDiscoveryService extends AbstractDiscoveryService implements
                 .withRepresentationProperty(PROPERTY_LXC_ID).build();
         thingDiscovered(result);
 
-        logger.debug("Discovered VM '{}' with id '{}' on node '{}'", lxc.getName(), lxc.getLxcId(), node.getNode());
+        logger.debug("Discovered LXC '{}' with id '{}' on node '{}'", lxc.getName(), lxc.getLxcId(), node.getNode());
     }
 
     public void removeDiscoveredLxc(ProxmoxLxc lxc) {
-        throw new UnsupportedOperationException("not yet implemented!");
+        ProxmoxHostBridgeHandler handler = bridgeHandler;
+        if (handler == null) {
+            return;
+        }
+
+        ThingUID bridgeUID = handler.getThing().getUID();
+        ThingUID uid = new ThingUID(ProxmoxBindingConstants.THING_TYPE_LXC, bridgeUID, lxc.getLxcId());
+        thingRemoved(uid);
+
+        logger.debug("Removed discovered LXC '{}' with id '{}'", lxc.getName(), lxc.getLxcId());
     }
 
     @Override

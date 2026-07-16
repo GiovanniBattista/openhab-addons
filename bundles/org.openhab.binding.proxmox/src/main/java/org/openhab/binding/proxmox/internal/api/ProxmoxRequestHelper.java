@@ -1,4 +1,4 @@
-/*
+/**
  * Copyright (c) 2010-2025 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
@@ -69,7 +69,7 @@ public class ProxmoxRequestHelper {
 
     public Request newPostRequest(String pathTemplate, String... pathTemplateValues) {
         return newRequest(MessageFormat.format(pathTemplate, (Object[]) pathTemplateValues)).method(HttpMethod.POST)
-                .header("Content-Type", "application/json");
+                .header("Content-Type", "application/x-www-form-urlencoded");
     }
 
     private Request newRequest(String path) {
@@ -88,6 +88,7 @@ public class ProxmoxRequestHelper {
         try {
             response = request.send();
         } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
             throw new ProxmoxApiCommunicationException("Request was interrupted", ex);
         } catch (TimeoutException ex) {
             throw new ProxmoxApiCommunicationException("Request - Timeout reached", ex);
@@ -116,6 +117,7 @@ public class ProxmoxRequestHelper {
         try {
             response = request.send();
         } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
             throw new ProxmoxApiCommunicationException("Request was interrupted", ex);
         } catch (TimeoutException ex) {
             throw new ProxmoxApiCommunicationException("Request - Timeout reached", ex);
@@ -143,6 +145,7 @@ public class ProxmoxRequestHelper {
         try {
             response = request.send();
         } catch (InterruptedException ex) {
+            Thread.currentThread().interrupt();
             throw new ProxmoxApiCommunicationException("Request was interrupted", ex);
         } catch (TimeoutException ex) {
             throw new ProxmoxApiCommunicationException("Request - Timeout reached", ex);

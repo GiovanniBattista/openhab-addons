@@ -1,4 +1,4 @@
-/*
+/**
  * Copyright (c) 2010-2025 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
@@ -22,88 +22,55 @@ public class ProxmoxNode {
     private String type;
     private String node;
     private NodeStatus status;
-    private int maxmem;
-    private int uptime;
-    private int disk;
+    private long maxmem;
+    private long uptime;
+    private long disk;
     private int maxcpu;
-    private int maxdisk;
+    private long maxdisk;
     private float cpu;
-    private int mem;
+    private long mem;
 
-    /**
-     * @return the id
-     */
     public String getId() {
         return id;
     }
 
-    /**
-     * @return the type
-     */
     public String getType() {
         return type;
     }
 
-    /**
-     * @return the node
-     */
     public String getNode() {
         return node;
     }
 
-    /**
-     * @return the status
-     */
     public NodeStatus getStatus() {
         return status;
     }
 
-    /**
-     * @return the maxmem
-     */
-    public int getMaxmem() {
+    public long getMaxmem() {
         return maxmem;
     }
 
-    /**
-     * @return the uptime
-     */
-    public int getUptime() {
+    public long getUptime() {
         return uptime;
     }
 
-    /**
-     * @return the disk
-     */
-    public int getDisk() {
+    public long getDisk() {
         return disk;
     }
 
-    /**
-     * @return the maxcpu
-     */
     public int getMaxcpu() {
         return maxcpu;
     }
 
-    /**
-     * @return the maxdisk
-     */
-    public int getMaxdisk() {
+    public long getMaxdisk() {
         return maxdisk;
     }
 
-    /**
-     * @return the cpu
-     */
     public float getCpu() {
         return cpu;
     }
 
-    /**
-     * @return the mem
-     */
-    public int getMem() {
+    public long getMem() {
         return mem;
     }
 }

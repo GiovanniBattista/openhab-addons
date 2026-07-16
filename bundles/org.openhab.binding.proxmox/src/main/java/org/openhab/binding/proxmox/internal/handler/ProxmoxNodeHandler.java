@@ -1,4 +1,4 @@
-/*
+/**
  * Copyright (c) 2010-2025 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
@@ -48,8 +48,8 @@ public class ProxmoxNodeHandler extends BaseThingHandler implements ProxmoxStatu
     // The minimum time in ms to skip the next update cycle if a command has been issued.
     private static final int MIN_SKIP_UPDATE_CYCLE_TIME = 30000;
 
-    private ProxmoxNodeConfiguration config;
-    private String nodeName;
+    private volatile ProxmoxNodeConfiguration config;
+    private volatile @Nullable String nodeName;
 
     private long endSkipTime = 0L;
 
@@ -199,7 +199,6 @@ public class ProxmoxNodeHandler extends BaseThingHandler implements ProxmoxStatu
             return false;
         }
 
-        // TODO Properly handle onStateChanged
         updateState(CHANNEL_POWER, OnOffType.from(node.getStatus() == NodeStatus.ONLINE));
 
         return true;

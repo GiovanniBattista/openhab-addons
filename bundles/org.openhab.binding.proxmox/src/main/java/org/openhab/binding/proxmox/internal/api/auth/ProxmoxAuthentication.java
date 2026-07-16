@@ -1,4 +1,4 @@
-/*
+/**
  * Copyright (c) 2010-2025 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
@@ -16,8 +16,9 @@ import java.net.HttpCookie;
 import java.time.LocalDateTime;
 
 import org.eclipse.jetty.client.api.Request;
-import org.eclipse.jetty.client.util.StringContentProvider;
+import org.eclipse.jetty.client.util.FormContentProvider;
 import org.eclipse.jetty.http.HttpMethod;
+import org.eclipse.jetty.util.Fields;
 import org.openhab.binding.proxmox.internal.api.ProxmoxRequestHelper;
 import org.openhab.binding.proxmox.internal.api.ProxmoxVEApiContext;
 import org.openhab.binding.proxmox.internal.api.exception.ProxmoxApiCommunicationException;
@@ -26,7 +27,6 @@ import org.openhab.binding.proxmox.internal.api.model.AccessTicketResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.google.gson.JsonObject;
 
 /**
  * ProxmoxAuthentication
@@ -82,12 +82,12 @@ public class ProxmoxAuthentication implements Authorization {
     private void initializeTokens() throws ProxmoxApiCommunicationException, ProxmoxApiConfigurationException {
         validateConfiguration();
 
-        JsonObject content = new JsonObject();
-        content.addProperty("username", context.getConfig().getUsername());
-        content.addProperty("password", context.getConfig().getPassword());
+        Fields fields = new Fields();
+        fields.put("username", context.getConfig().getUsername());
+        fields.put("password", context.getConfig().getPassword());
 
         Request request = requestHelper.newPostRequest("/access/ticket")
-                .content(new StringContentProvider(content.toString()));
+                .content(new FormContentProvider(fields));
 
         accessTicket = requestHelper.getContent(request, AccessTicketResponse.class);
     }

@@ -1,4 +1,4 @@
-/*
+/**
  * Copyright (c) 2010-2025 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
@@ -18,7 +18,8 @@ import java.util.Objects;
 
 import org.eclipse.jdt.annotation.NonNull;
 import org.eclipse.jetty.client.api.Request;
-import org.eclipse.jetty.client.util.StringContentProvider;
+import org.eclipse.jetty.client.util.FormContentProvider;
+import org.eclipse.jetty.util.Fields;
 import org.openhab.binding.proxmox.internal.api.auth.Authorization;
 import org.openhab.binding.proxmox.internal.api.exception.ProxmoxApiCommunicationException;
 import org.openhab.binding.proxmox.internal.api.exception.ProxmoxApiConfigurationException;
@@ -29,7 +30,6 @@ import org.openhab.binding.proxmox.internal.api.model.ProxmoxVersion;
 import org.openhab.binding.proxmox.internal.api.model.ProxmoxVm;
 import org.openhab.binding.proxmox.internal.api.model.StatusCommand;
 
-import com.google.gson.JsonObject;
 import com.google.gson.reflect.TypeToken;
 
 /**
@@ -76,7 +76,7 @@ public class ProxmoxVEApi {
 
     public ProxmoxNodeStatus getNodeStatus(String id)
             throws ProxmoxApiCommunicationException, ProxmoxApiConfigurationException {
-        Request request = requestHelper.newGetRequest("nodes/{0}/aplinfo", id);
+        Request request = requestHelper.newGetRequest("nodes/{0}/status", id);
         auth.authenticate(request);
 
         return requestHelper.getContent(request, ProxmoxNodeStatus.class);
@@ -121,11 +121,10 @@ public class ProxmoxVEApi {
         Request request = requestHelper.newPostRequest("nodes/{0}/status", nodeId);
         auth.authenticate(request);
 
-        JsonObject object = new JsonObject();
-        object.addProperty("node", nodeId);
-        object.addProperty("command", Objects.toString(command));
-
-        request.content(new StringContentProvider(object.toString()));
+        Fields fields = new Fields();
+        fields.put("node", nodeId);
+        fields.put("command", Objects.toString(command));
+        request.content(new FormContentProvider(fields));
 
         requestHelper.sendRequest(request);
     }
@@ -162,12 +161,6 @@ public class ProxmoxVEApi {
         Request request = requestHelper.newPostRequest("nodes/{0}/qemu/{1}/status/shutdown", nodeName, vmId);
         auth.authenticate(request);
 
-        JsonObject object = new JsonObject();
-        object.addProperty("node", nodeName);
-        object.addProperty("vmid", Integer.valueOf(vmId));
-
-        request.content(new StringContentProvider(object.toString()));
-
         requestHelper.sendRequest(request);
     }
 
@@ -185,12 +178,6 @@ public class ProxmoxVEApi {
 
         Request request = requestHelper.newPostRequest("nodes/{0}/qemu/{1}/status/start", nodeName, vmId);
         auth.authenticate(request);
-
-        JsonObject object = new JsonObject();
-        object.addProperty("node", nodeName);
-        object.addProperty("vmid", Integer.valueOf(vmId));
-
-        request.content(new StringContentProvider(object.toString()));
 
         requestHelper.sendRequest(request);
     }
@@ -210,12 +197,6 @@ public class ProxmoxVEApi {
         Request request = requestHelper.newPostRequest("nodes/{0}/lxc/{1}/status/shutdown", nodeName, lxcId);
         auth.authenticate(request);
 
-        JsonObject object = new JsonObject();
-        object.addProperty("node", nodeName);
-        object.addProperty("vmid", Integer.valueOf(lxcId));
-
-        request.content(new StringContentProvider(object.toString()));
-
         requestHelper.sendRequest(request);
     }
 
@@ -233,12 +214,6 @@ public class ProxmoxVEApi {
 
         Request request = requestHelper.newPostRequest("nodes/{0}/lxc/{1}/status/start", nodeName, lxcId);
         auth.authenticate(request);
-
-        JsonObject object = new JsonObject();
-        object.addProperty("node", nodeName);
-        object.addProperty("vmid", Integer.valueOf(lxcId));
-
-        request.content(new StringContentProvider(object.toString()));
 
         requestHelper.sendRequest(request);
     }

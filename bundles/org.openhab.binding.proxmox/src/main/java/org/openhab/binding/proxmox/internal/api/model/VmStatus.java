@@ -1,4 +1,4 @@
-/*
+/**
  * Copyright (c) 2010-2025 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
@@ -26,7 +26,10 @@ public enum VmStatus {
     STOPPED("stopped"),
 
     @SerializedName("running")
-    RUNNING("running");
+    RUNNING("running"),
+
+    @SerializedName("paused")
+    PAUSED("paused");
 
     private final String value;
 

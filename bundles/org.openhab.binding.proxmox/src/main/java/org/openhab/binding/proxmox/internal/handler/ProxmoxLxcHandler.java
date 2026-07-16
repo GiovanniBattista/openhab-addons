@@ -1,4 +1,4 @@
-/*
+/**
  * Copyright (c) 2010-2025 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
@@ -44,8 +44,8 @@ public class ProxmoxLxcHandler extends BaseThingHandler implements ProxmoxStatus
     // The minimum time in ms to skip the next update cycle if a command has been issued.
     private static final int MIN_SKIP_UPDATE_CYCLE_TIME = 10000;
 
-    private String nodeName;
-    private String lxcId;
+    private volatile @Nullable String nodeName;
+    private volatile @Nullable String lxcId;
 
     private long endSkipTime = 0L;
 
@@ -161,7 +161,7 @@ public class ProxmoxLxcHandler extends BaseThingHandler implements ProxmoxStatus
     public void dispose() {
         super.dispose();
 
-        logger.debug("VM was disposed. Unregister listener.");
+        logger.debug("LXC was disposed. Unregister listener.");
         ProxmoxHostBridgeHandler bridgeHandler = ProxmoxHostBridgeHandlerHelper.getBridgeHandler(getBridge());
         if (lxcId != null && bridgeHandler != null) {
             bridgeHandler.unregisterLxcStatusChangeListener(lxcId);
@@ -179,24 +179,22 @@ public class ProxmoxLxcHandler extends BaseThingHandler implements ProxmoxStatus
     }
 
     @Override
-    public boolean onStateChanged(ProxmoxLxc vm) {
+    public boolean onStateChanged(ProxmoxLxc lxc) {
         logger.trace("onStateChanged was called!");
 
         if (System.currentTimeMillis() <= endSkipTime) {
-
             logger.debug("Skipping update cycle for id: {}", lxcId);
             return false;
         }
 
-        // TODO Properly handle onStateChanged
-        updateState(CHANNEL_POWER, OnOffType.from(vm.getStatus() == VmStatus.RUNNING));
+        updateState(CHANNEL_POWER, OnOffType.from(lxc.getStatus() == VmStatus.RUNNING));
 
         return true;
     }
 
     @Override
-    public void onAdded(ProxmoxLxc vm) {
-        onStateChanged(vm);
+    public void onAdded(ProxmoxLxc lxc) {
+        onStateChanged(lxc);
     }
 
     @Override
