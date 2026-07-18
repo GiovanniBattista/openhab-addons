@@ -1,78 +1,98 @@
 # Proxmox Binding
 
-_Give some details about what this binding is meant for - a protocol, system, specific device._
+This binding integrates [Proxmox VE](https://www.proxmox.com/en/proxmox-virtual-environment) hosts into openHAB.
 
-_If possible, provide some resources like pictures, a YouTube video, etc. to give an impression of what can be done with this binding. You can place such resources into a `doc` folder next to this README.md._
+It connects to the Proxmox VE REST API, automatically discovers the nodes, virtual machines (QEMU) and containers (LXC) of a host and lets you:
+
+- start and stop VMs and LXC containers,
+- shut down or wake nodes (physical hosts), including Wake on LAN when the host is powered off, and
+- monitor status, CPU load, memory, disk usage and uptime.
 
 ## Supported Things
 
-Node, VM, LXC
-
-_Please describe the different supported things / devices within this section._
-_Which different types are supported, which models were tested etc.?_
-_Note that it is planned to generate some part of this based on the XML files within ```src/main/resources/OH-INF/thing``` of your binding._
-
+| Thing type | Type   | Description                                                              |
+|------------|--------|--------------------------------------------------------------------------|
+| `host`     | Bridge | A Proxmox VE host. Holds the connection and polls the API.               |
+| `node`     | Thing  | A node (physical host) of a Proxmox VE (cluster).                        |
+| `vm`       | Thing  | A QEMU virtual machine running on a node.                               |
+| `lxc`      | Thing  | A Linux container (LXC) running on a node.                              |
 
 ## Discovery
 
-_Describe the available auto-discovery features here. Mention for what it works and what needs to be kept in mind when using it._
-
-## Binding Configuration
-
-_If your binding requires or supports general configuration settings, please create a folder ```cfg``` and place the configuration file ```<bindingId>.cfg``` inside it. In this section, you should link to this file and provide some information about the options. The file could e.g. look like:_
-
-```
-# Configuration for the Philips Hue Binding
-#
-# Default secret key for the pairing of the Philips Hue Bridge.
-# It has to be between 10-40 (alphanumeric) characters
-# This may be changed by the user for security reasons.
-secret=openHABSecret
-```
-
-_Note that it is planned to generate some part of this based on the information that is available within ```src/main/resources/OH-INF/binding``` of your binding._
-
-_If your binding does not offer any generic configurations, you can remove this section completely._
-
+Once a `host` bridge is configured and `ONLINE`, its nodes, VMs and containers are discovered automatically and appear in the inbox.
+Newly created and removed guests are picked up on the next polling cycle, so background discovery keeps the inbox in sync without a manual scan.
 
 ## Bridge Configuration
 
-### Proxmox Configuration
+The binding requires a Proxmox user with the following permissions:
 
-The binding requires a Proxmox user having the following permissions:
+```text
+Start/stop nodes:    ["perm","/nodes/{node}",["Sys.PowerMgmt"]]
+List VMs and LXCs:   ["perm","/vms/{vmid}",["VM.Audit"]]
+Start/stop VMs/LXCs: ["perm","/vms/{vmid}",["VM.PowerMgmt"]]
+```
 
-```
-Start/stop nodes: ["perm","/nodes/{node}",["Sys.PowerMgmt"]]
-List VMs and LXCs: ["perm", "/vms/{vmid}", ["VM.Audit"]]
-Start/stop vms: ["perm","/vms/{vmid}",["VM.PowerMgmt"]]
-All other operations do not require special permissions
-```
-Therefore, it is best to create a separate user for the Proxmox binding. 
-1. Open the Datacenter / Permissions / User and add a new Proxmox user (e.g. named Openhab).
-    Note: For users in the Linux PAM realm, the user needs to be added locally via shell, see: https://pve.proxmox.com/wiki/User_Management
-2. Go to Datacenter / Permsissions / Roles and create a new "Openhab" role with the permissions Sys.PowerMgmt, VM.Audit and VM.PowerMgmt
-3. Navigate to Datacenter / Permissions and create a new permission for "/" and the openhab user with the above rule.
+All other operations do not require special permissions.
+It is therefore recommended to create a dedicated user for the binding:
+
+1. Open _Datacenter → Permissions → Users_ and add a new user (e.g. `openhab`).
+   Note: for users in the Linux PAM realm, the user also needs to exist locally, see the [Proxmox user management wiki](https://pve.proxmox.com/wiki/User_Management).
+1. Open _Datacenter → Permissions → Roles_ and create a new role (e.g. `openhab`) with the privileges `Sys.PowerMgmt`, `VM.Audit` and `VM.PowerMgmt`.
+1. Open _Datacenter → Permissions_ and add a new permission for path `/`, the `openhab` user and the role created above.
+
+The `host` bridge has the following configuration parameters:
+
+| Parameter         | Required | Default | Description                                                                                                            |
+|-------------------|----------|---------|----------------------------------------------------------------------------------------------------------------------|
+| `baseUrl`         | yes      |         | Base URL of the Proxmox VE API, e.g. `https://pve:8006/`.                                                             |
+| `username`        | yes      |         | User name including the realm, e.g. `openhab@pam`.                                                                    |
+| `password`        | yes      |         | Password of the API user.                                                                                            |
+| `macAddress`      | no       |         | MAC address of the host, used to power it on via Wake on LAN. If left empty, the binding tries to auto-detect it via ARP. |
+| `pollingInterval` | no       | 30      | Seconds between two polls of the Proxmox API.                                                                         |
 
 ## Thing Configuration
 
-_Describe what is needed to manually configure a thing, either through the (Paper) UI or via a thing-file. This should be mainly about its mandatory and optional configuration parameters. A short example entry for a thing file can help!_
-
-_Note that it is planned to generate some part of this based on the XML files within ```src/main/resources/OH-INF/thing``` of your binding._
+The `node`, `vm` and `lxc` things do not require any configuration.
+They are identified by properties (node name and VM/container id) that are set automatically during discovery, so the recommended way to add them is via the inbox.
 
 ## Channels
 
-_Here you should provide information about available channel types, what their meaning is and how they can be used._
+All telemetry channels are read-only. The `power` channel is the only writable channel.
 
-_Note that it is planned to generate some part of this based on the XML files within ```src/main/resources/OH-INF/thing``` of your binding._
+| Channel        | Type                | Description                                                                                                   |
+|----------------|---------------------|-------------------------------------------------------------------------------------------------------------|
+| `power`        | Switch              | `ON` starts the guest / wakes the node, `OFF` shuts it down. Reflects the running state while polling.       |
+| `status`       | String              | The raw status reported by Proxmox VE (e.g. `running`, `stopped`, `online`, `offline`).                      |
+| `cpu-load`     | Number:Dimensionless| Current CPU load in percent.                                                                                 |
+| `memory-used`  | Number:DataAmount   | Currently used memory.                                                                                       |
+| `memory-total` | Number:DataAmount   | Maximum available memory.                                                                                    |
+| `disk-used`    | Number:DataAmount   | Currently used disk space (nodes and containers only).                                                       |
+| `disk-total`   | Number:DataAmount   | Maximum available disk space.                                                                                |
+| `uptime`       | Number:Time         | Time elapsed since the last boot.                                                                            |
 
-| channel  | type   | description                  |
-|----------|--------|------------------------------|
-| control  | Switch | This is the control channel  |
+> Note: Sending `OFF` to the `power` channel of a `node` shuts down the physical host. Use it with care.
 
 ## Full Example
 
-_Provide a full usage example based on textual configuration files (*.things, *.items, *.sitemap)._
+`proxmox.things`:
 
-## Any custom content here!
+```java
+Bridge proxmox:host:pve "Proxmox Host" [ baseUrl="https://pve:8006/", username="openhab@pam", password="secret", pollingInterval=30 ] {
+    Thing node pve    "Proxmox Node pve"
+    Thing vm   100    "Home Assistant VM"
+    Thing lxc  101    "Pi-hole Container"
+}
+```
 
-_Feel free to add additional sections for whatever you think should also be mentioned about your binding!_
+`proxmox.items`:
+
+```java
+Switch       Pve_Node_Power    "Node Power"          { channel="proxmox:node:pve:pve:power" }
+Number:Dimensionless Pve_Node_Cpu "Node CPU [%.1f %%]" { channel="proxmox:node:pve:pve:cpu-load" }
+
+Switch       Ha_Vm_Power       "Home Assistant"      { channel="proxmox:vm:pve:100:power" }
+Number:DataAmount Ha_Vm_Mem    "Memory Used [%.1f %unit%]" { channel="proxmox:vm:pve:100:memory-used" }
+
+Switch       Pihole_Power      "Pi-hole"             { channel="proxmox:lxc:pve:101:power" }
+Number:Time  Pihole_Uptime     "Uptime [%.0f %unit%]" { channel="proxmox:lxc:pve:101:uptime" }
+```

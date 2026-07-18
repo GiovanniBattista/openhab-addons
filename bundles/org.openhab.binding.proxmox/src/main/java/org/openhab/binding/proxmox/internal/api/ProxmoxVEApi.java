@@ -1,5 +1,5 @@
-/**
- * Copyright (c) 2010-2025 Contributors to the openHAB project
+/*
+ * Copyright (c) 2010-2026 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -16,7 +16,7 @@ import java.lang.reflect.Type;
 import java.util.List;
 import java.util.Objects;
 
-import org.eclipse.jdt.annotation.NonNull;
+import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jetty.client.api.Request;
 import org.eclipse.jetty.client.util.FormContentProvider;
 import org.eclipse.jetty.util.Fields;
@@ -37,14 +37,13 @@ import com.google.gson.reflect.TypeToken;
  *
  * @author Daniel Zupan - Initial contribution
  */
+@NonNullByDefault
 public class ProxmoxVEApi {
 
-    private final ProxmoxVEApiContext context;
     private final Authorization auth;
     private final ProxmoxRequestHelper requestHelper;
 
     public ProxmoxVEApi(ProxmoxVEApiContext context, Authorization auth) {
-        this.context = context;
         this.auth = auth;
         this.requestHelper = ProxmoxRequestHelper.of(context);
     }
@@ -63,8 +62,7 @@ public class ProxmoxVEApi {
         return requestHelper.getContent(request, ProxmoxVersion.class);
     }
 
-    public List<@NonNull ProxmoxNode> getNodes()
-            throws ProxmoxApiCommunicationException, ProxmoxApiConfigurationException {
+    public List<ProxmoxNode> getNodes() throws ProxmoxApiCommunicationException, ProxmoxApiConfigurationException {
 
         Request request = requestHelper.newGetRequest("nodes");
         auth.authenticate(request);
@@ -82,10 +80,15 @@ public class ProxmoxVEApi {
         return requestHelper.getContent(request, ProxmoxNodeStatus.class);
     }
 
-    public @NonNull List<@NonNull ProxmoxVm> getVMs(ProxmoxNode node)
+    public List<ProxmoxVm> getVMs(ProxmoxNode node)
             throws ProxmoxApiCommunicationException, ProxmoxApiConfigurationException {
 
-        Request request = requestHelper.newGetRequest("nodes/{0}/qemu", node.getNode());
+        String nodeName = node.getNode();
+        if (nodeName == null) {
+            return List.of();
+        }
+
+        Request request = requestHelper.newGetRequest("nodes/{0}/qemu", nodeName);
         auth.authenticate(request);
 
         Type collectionType = new TypeToken<List<ProxmoxVm>>() {
@@ -93,9 +96,14 @@ public class ProxmoxVEApi {
         return requestHelper.getContentAsList(request, collectionType);
     }
 
-    public @NonNull List<@NonNull ProxmoxLxc> getLXCs(ProxmoxNode node)
+    public List<ProxmoxLxc> getLXCs(ProxmoxNode node)
             throws ProxmoxApiCommunicationException, ProxmoxApiConfigurationException {
-        Request request = requestHelper.newGetRequest("nodes/{0}/lxc", node.getNode());
+        String nodeName = node.getNode();
+        if (nodeName == null) {
+            return List.of();
+        }
+
+        Request request = requestHelper.newGetRequest("nodes/{0}/lxc", nodeName);
         auth.authenticate(request);
 
         Type collectionType = new TypeToken<List<ProxmoxLxc>>() {

@@ -1,5 +1,5 @@
-/**
- * Copyright (c) 2010-2025 Contributors to the openHAB project
+/*
+ * Copyright (c) 2010-2026 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -19,30 +19,39 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import org.eclipse.jdt.annotation.NonNullByDefault;
+import org.eclipse.jdt.annotation.Nullable;
 import org.eclipse.jetty.client.api.ContentResponse;
 import org.eclipse.jetty.client.api.Request;
 import org.eclipse.jetty.http.HttpMethod;
 import org.eclipse.jetty.http.HttpStatus;
 import org.openhab.binding.proxmox.internal.api.exception.ProxmoxApiCommunicationException;
+import org.openhab.binding.proxmox.internal.api.exception.ProxmoxApiConfigurationException;
 
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
 /**
- * Simple request builder for convenience
+ * Simple request builder for convenience.
  *
  * @author Daniel Zupan - Initial contribution
  */
+@NonNullByDefault
 public class ProxmoxRequestHelper {
 
     private static final String API_BASE_PATH = "api2/json";
+    private static final int REQUEST_TIMEOUT_MILLIS = 5000;
 
     private final ProxmoxVEApiContext context;
     private final String apiUrl;
 
     public static ProxmoxRequestHelper of(ProxmoxVEApiContext context) {
         String baseUrl = context.getConfig().getBaseUrl();
+        if (baseUrl == null) {
+            baseUrl = "";
+        }
 
-        StringBuilder apiUrlBuilder = new StringBuilder(context.getConfig().getBaseUrl());
+        StringBuilder apiUrlBuilder = new StringBuilder(baseUrl);
         if (!baseUrl.endsWith("/")) {
             apiUrlBuilder.append("/");
         }
@@ -57,10 +66,10 @@ public class ProxmoxRequestHelper {
     }
 
     /**
-     * Makes a new request
+     * Makes a new GET request.
      *
-     * @param pathTemplate a path as {@link MessageFormat} template, like "/nodes/{0}/status"
-     * @param pathTemplateValues "pve"
+     * @param pathTemplate a path as {@link MessageFormat} template, like "nodes/{0}/status"
+     * @param pathTemplateValues the values to fill into the template, e.g. "pve"
      * @return the new request
      */
     public Request newGetRequest(String pathTemplate, String... pathTemplateValues) {
@@ -68,82 +77,50 @@ public class ProxmoxRequestHelper {
     }
 
     public Request newPostRequest(String pathTemplate, String... pathTemplateValues) {
-        return newRequest(MessageFormat.format(pathTemplate, (Object[]) pathTemplateValues)).method(HttpMethod.POST)
-                .header("Content-Type", "application/x-www-form-urlencoded");
+        return newRequest(MessageFormat.format(pathTemplate, (Object[]) pathTemplateValues)).method(HttpMethod.POST);
     }
 
     private Request newRequest(String path) {
-        // TODO Make timeout configurable?
-        String validPath = path;
-        if (!path.startsWith("/")) {
-            validPath = "/" + validPath;
-        }
-        return context.getHttpClient().newRequest(apiUrl + validPath).timeout(5000, TimeUnit.MILLISECONDS)
-                .accept("application/json");
+        String validPath = path.startsWith("/") ? path : "/" + path;
+        return context.getHttpClient().newRequest(apiUrl + validPath)
+                .timeout(REQUEST_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS).accept("application/json");
     }
 
-    public <T> T getContent(Request request, Class<T> classToExtract) throws ProxmoxApiCommunicationException {
-        T content;
-        ContentResponse response;
-        try {
-            response = request.send();
-        } catch (InterruptedException ex) {
-            Thread.currentThread().interrupt();
-            throw new ProxmoxApiCommunicationException("Request was interrupted", ex);
-        } catch (TimeoutException ex) {
-            throw new ProxmoxApiCommunicationException("Request - Timeout reached", ex);
-        } catch (ExecutionException ex) {
-            throw new ProxmoxApiCommunicationException("Request failed", ex);
-        }
+    public <T> T getContent(Request request, Class<T> classToExtract)
+            throws ProxmoxApiCommunicationException, ProxmoxApiConfigurationException {
+        ContentResponse response = send(request);
+        checkStatus(response);
 
-        int statusCode = response.getStatus();
-        if (statusCode == HttpStatus.OK_200) {
-            JsonObject responseContainer = context.getGson().fromJson(response.getContentAsString(), JsonObject.class);
-            if (responseContainer != null && responseContainer.has("data")) {
-                content = context.getGson().fromJson(responseContainer.get("data"), classToExtract);
-            } else {
-                throw new ProxmoxApiCommunicationException("No content was provided in response");
-            }
-        } else {
-            throw new ProxmoxApiCommunicationException(
-                    "API call returned invalid status code. StatusCode=" + statusCode);
+        JsonElement data = extractData(response);
+        @Nullable
+        T content = context.getGson().fromJson(data, classToExtract);
+        if (content == null) {
+            throw new ProxmoxApiCommunicationException("No content was provided in response");
         }
         return content;
     }
 
-    public <T> List<T> getContentAsList(Request request, Type collectionType) throws ProxmoxApiCommunicationException {
-        List<T> content;
-        ContentResponse response;
-        try {
-            response = request.send();
-        } catch (InterruptedException ex) {
-            Thread.currentThread().interrupt();
-            throw new ProxmoxApiCommunicationException("Request was interrupted", ex);
-        } catch (TimeoutException ex) {
-            throw new ProxmoxApiCommunicationException("Request - Timeout reached", ex);
-        } catch (ExecutionException ex) {
-            throw new ProxmoxApiCommunicationException("Request failed", ex);
-        }
+    public <T> List<T> getContentAsList(Request request, Type collectionType)
+            throws ProxmoxApiCommunicationException, ProxmoxApiConfigurationException {
+        ContentResponse response = send(request);
+        checkStatus(response);
 
-        int statusCode = response.getStatus();
-        if (statusCode == HttpStatus.OK_200) {
-            JsonObject responseContainer = context.getGson().fromJson(response.getContentAsString(), JsonObject.class);
-            if (responseContainer != null && responseContainer.has("data")) {
-                content = context.getGson().fromJson(responseContainer.get("data"), collectionType);
-            } else {
-                throw new ProxmoxApiCommunicationException("No content was provided in response");
-            }
-        } else {
-            throw new ProxmoxApiCommunicationException(
-                    "API call returned invalid status code. StatusCode=" + statusCode);
+        JsonElement data = extractData(response);
+        List<T> content = context.getGson().fromJson(data, collectionType);
+        if (content == null) {
+            throw new ProxmoxApiCommunicationException("No content was provided in response");
         }
         return content;
     }
 
-    public void sendRequest(Request request) throws ProxmoxApiCommunicationException {
-        ContentResponse response;
+    public void sendRequest(Request request) throws ProxmoxApiCommunicationException, ProxmoxApiConfigurationException {
+        ContentResponse response = send(request);
+        checkStatus(response);
+    }
+
+    private ContentResponse send(Request request) throws ProxmoxApiCommunicationException {
         try {
-            response = request.send();
+            return request.send();
         } catch (InterruptedException ex) {
             Thread.currentThread().interrupt();
             throw new ProxmoxApiCommunicationException("Request was interrupted", ex);
@@ -152,11 +129,31 @@ public class ProxmoxRequestHelper {
         } catch (ExecutionException ex) {
             throw new ProxmoxApiCommunicationException("Request failed", ex);
         }
+    }
 
+    private void checkStatus(ContentResponse response)
+            throws ProxmoxApiCommunicationException, ProxmoxApiConfigurationException {
         int statusCode = response.getStatus();
-        if (statusCode != HttpStatus.OK_200) {
-            throw new ProxmoxApiCommunicationException(
-                    "API call returned invalid status code. StatusCode=" + statusCode);
+        if (statusCode == HttpStatus.OK_200) {
+            return;
         }
+
+        String reason = response.getReason();
+        String reasonSuffix = reason.isBlank() ? "" : ": " + reason;
+        if (statusCode == HttpStatus.UNAUTHORIZED_401 || statusCode == HttpStatus.FORBIDDEN_403) {
+            throw new ProxmoxApiConfigurationException("Authentication failed (HTTP " + statusCode
+                    + "). Please verify the user name (including the realm, e.g. openhab@pam), the password and the "
+                    + "assigned permissions" + reasonSuffix);
+        }
+        throw new ProxmoxApiCommunicationException(
+                "API call returned unexpected status code " + statusCode + reasonSuffix);
+    }
+
+    private JsonElement extractData(ContentResponse response) throws ProxmoxApiCommunicationException {
+        JsonObject responseContainer = context.getGson().fromJson(response.getContentAsString(), JsonObject.class);
+        if (responseContainer != null && responseContainer.has("data") && !responseContainer.get("data").isJsonNull()) {
+            return responseContainer.get("data");
+        }
+        throw new ProxmoxApiCommunicationException("No content was provided in response");
     }
 }

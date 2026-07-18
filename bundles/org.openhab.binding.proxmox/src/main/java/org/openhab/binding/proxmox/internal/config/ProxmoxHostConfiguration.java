@@ -1,5 +1,5 @@
-/**
- * Copyright (c) 2010-2025 Contributors to the openHAB project
+/*
+ * Copyright (c) 2010-2026 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -12,37 +12,41 @@
  */
 package org.openhab.binding.proxmox.internal.config;
 
+import org.eclipse.jdt.annotation.NonNullByDefault;
+import org.eclipse.jdt.annotation.Nullable;
+
 /**
  * ProxmoxHostConfiguration
  *
  * @author Daniel Zupan - Initial contribution
  */
+@NonNullByDefault
 public class ProxmoxHostConfiguration {
-    private String baseUrl;
-    private String username;
-    private String password;
-    private String macAddress;
+    private @Nullable String baseUrl;
+    private @Nullable String username;
+    private @Nullable String password;
+    private @Nullable String macAddress;
 
-    private int pollingInterval;
+    private int pollingInterval = 30;
 
     /**
      * @return the baseUrl
      */
-    public String getBaseUrl() {
+    public @Nullable String getBaseUrl() {
         return baseUrl;
     }
 
     /**
      * @return the username
      */
-    public String getUsername() {
+    public @Nullable String getUsername() {
         return username;
     }
 
     /**
      * @return the password
      */
-    public String getPassword() {
+    public @Nullable String getPassword() {
         return password;
     }
 
@@ -56,7 +60,7 @@ public class ProxmoxHostConfiguration {
     /**
      * @return the macAddress
      */
-    public String getMacAddress() {
+    public @Nullable String getMacAddress() {
         return macAddress;
     }
 

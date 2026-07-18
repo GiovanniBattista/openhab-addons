@@ -1,5 +1,5 @@
-/**
- * Copyright (c) 2010-2025 Contributors to the openHAB project
+/*
+ * Copyright (c) 2010-2026 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -15,6 +15,8 @@ package org.openhab.binding.proxmox.internal.api.auth;
 import java.net.HttpCookie;
 import java.time.LocalDateTime;
 
+import org.eclipse.jdt.annotation.NonNullByDefault;
+import org.eclipse.jdt.annotation.Nullable;
 import org.eclipse.jetty.client.api.Request;
 import org.eclipse.jetty.client.util.FormContentProvider;
 import org.eclipse.jetty.http.HttpMethod;
@@ -24,23 +26,21 @@ import org.openhab.binding.proxmox.internal.api.ProxmoxVEApiContext;
 import org.openhab.binding.proxmox.internal.api.exception.ProxmoxApiCommunicationException;
 import org.openhab.binding.proxmox.internal.api.exception.ProxmoxApiConfigurationException;
 import org.openhab.binding.proxmox.internal.api.model.AccessTicketResponse;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 
 /**
- * ProxmoxAuthentication
+ * Authenticates requests against the Proxmox VE API using the ticket/cookie based authentication.
  *
  * @author Daniel Zupan - Initial contribution
+ *
+ * @see <a href="https://pve.proxmox.com/wiki/Proxmox_VE_API#Authentication">Proxmox VE API authentication</a>
  */
+@NonNullByDefault
 public class ProxmoxAuthentication implements Authorization {
-
-    private final Logger logger = LoggerFactory.getLogger(ProxmoxAuthentication.class);
 
     private final ProxmoxVEApiContext context;
     private final ProxmoxRequestHelper requestHelper;
 
-    private AccessTicketResponse accessTicket;
+    private @Nullable AccessTicketResponse accessTicket;
 
     public ProxmoxAuthentication(ProxmoxVEApiContext context) {
         this.context = context;
@@ -48,65 +48,70 @@ public class ProxmoxAuthentication implements Authorization {
     }
 
     /**
-     * Adds the authentication token as cookie to the given request.
-     *
-     * @throws ProxmoxApiConfigurationException
-     * @throws ProxmoxApiCommunicationException
-     * @throws ProxmoxApiInvalidResponseException
-     *
-     * @see https://pve.proxmox.com/wiki/Proxmox_VE_API#Authentication
+     * Adds the authentication ticket as a cookie to the given request and, for write requests, the required
+     * CSRF prevention token header.
      */
     @Override
-    public void authenticate(Request request)
+    public synchronized void authenticate(Request request)
             throws ProxmoxApiCommunicationException, ProxmoxApiConfigurationException {
-        HttpCookie authCookie = new HttpCookie("PVEAuthCookie", getAuthToken());
-        request.cookie(authCookie);
+        AccessTicketResponse ticket = getValidTicket();
+
+        String ticketValue = ticket.getTicket();
+        if (ticketValue == null) {
+            throw new ProxmoxApiCommunicationException("Received an empty authentication ticket");
+        }
+        request.cookie(new HttpCookie("PVEAuthCookie", ticketValue));
 
         if (isWriteRequest(request)) {
             // any write request must include the CSRFPreventionToken header
-            request.header("CSRFPreventionToken", getCSRFPreventionToken());
+            String csrfPreventionToken = ticket.getCsrfPreventionToken();
+            if (csrfPreventionToken != null) {
+                request.header("CSRFPreventionToken", csrfPreventionToken);
+            }
         }
     }
 
-    private String getAuthToken() throws ProxmoxApiCommunicationException, ProxmoxApiConfigurationException {
-        if (accessTicket == null || isExpired()) {
-            initializeTokens();
+    private AccessTicketResponse getValidTicket()
+            throws ProxmoxApiCommunicationException, ProxmoxApiConfigurationException {
+        AccessTicketResponse ticket = accessTicket;
+        if (ticket == null || isExpired(ticket)) {
+            ticket = initializeTokens();
         }
-        return accessTicket.getTicket();
+        return ticket;
     }
 
-    private String getCSRFPreventionToken() {
-        return accessTicket.getCsrfPreventionToken(); // this token should already be the latest one
-    }
-
-    private void initializeTokens() throws ProxmoxApiCommunicationException, ProxmoxApiConfigurationException {
+    private AccessTicketResponse initializeTokens()
+            throws ProxmoxApiCommunicationException, ProxmoxApiConfigurationException {
         validateConfiguration();
 
         Fields fields = new Fields();
         fields.put("username", context.getConfig().getUsername());
         fields.put("password", context.getConfig().getPassword());
 
-        Request request = requestHelper.newPostRequest("/access/ticket")
-                .content(new FormContentProvider(fields));
+        Request request = requestHelper.newPostRequest("/access/ticket").content(new FormContentProvider(fields));
 
-        accessTicket = requestHelper.getContent(request, AccessTicketResponse.class);
+        AccessTicketResponse ticket = requestHelper.getContent(request, AccessTicketResponse.class);
+        accessTicket = ticket;
+        return ticket;
     }
 
     private void validateConfiguration() throws ProxmoxApiConfigurationException {
-        // TODO add regex validation for base url
-        if (context.getConfig().getBaseUrl() == null || context.getConfig().getBaseUrl().isEmpty()) {
+        String baseUrl = context.getConfig().getBaseUrl();
+        if (baseUrl == null || baseUrl.isEmpty()) {
             throw new ProxmoxApiConfigurationException("Base URL is missing!");
         }
-        if (context.getConfig().getUsername() == null || context.getConfig().getUsername().isEmpty()) {
+        String username = context.getConfig().getUsername();
+        if (username == null || username.isEmpty()) {
             throw new ProxmoxApiConfigurationException("No username was provided!");
         }
-        if (context.getConfig().getPassword() == null || context.getConfig().getPassword().isEmpty()) {
+        String password = context.getConfig().getPassword();
+        if (password == null || password.isEmpty()) {
             throw new ProxmoxApiConfigurationException("No password was provided!");
         }
     }
 
-    private boolean isExpired() {
-        return accessTicket == null || accessTicket.getTokenExpiration().isBefore(LocalDateTime.now());
+    private boolean isExpired(AccessTicketResponse ticket) {
+        return ticket.getTokenExpiration().isBefore(LocalDateTime.now());
     }
 
     private boolean isWriteRequest(Request request) {

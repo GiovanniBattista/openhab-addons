@@ -1,5 +1,5 @@
-/**
- * Copyright (c) 2010-2025 Contributors to the openHAB project
+/*
+ * Copyright (c) 2010-2026 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -12,16 +12,20 @@
  */
 package org.openhab.binding.proxmox.internal.api.model;
 
+import org.eclipse.jdt.annotation.NonNullByDefault;
+import org.eclipse.jdt.annotation.Nullable;
+
 /**
  * ProxmoxNode
  *
  * @author Daniel Zupan - Initial contribution
  */
+@NonNullByDefault
 public class ProxmoxNode {
-    private String id;
-    private String type;
-    private String node;
-    private NodeStatus status;
+    private @Nullable String id;
+    private @Nullable String type;
+    private @Nullable String node;
+    private @Nullable NodeStatus status;
     private long maxmem;
     private long uptime;
     private long disk;
@@ -30,19 +34,19 @@ public class ProxmoxNode {
     private float cpu;
     private long mem;
 
-    public String getId() {
+    public @Nullable String getId() {
         return id;
     }
 
-    public String getType() {
+    public @Nullable String getType() {
         return type;
     }
 
-    public String getNode() {
+    public @Nullable String getNode() {
         return node;
     }
 
-    public NodeStatus getStatus() {
+    public @Nullable NodeStatus getStatus() {
         return status;
     }
 

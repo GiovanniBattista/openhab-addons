@@ -1,5 +1,5 @@
-/**
- * Copyright (c) 2010-2025 Contributors to the openHAB project
+/*
+ * Copyright (c) 2010-2026 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -12,6 +12,7 @@
  */
 package org.openhab.binding.proxmox.internal.api;
 
+import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jetty.client.HttpClient;
 import org.openhab.binding.proxmox.internal.api.auth.Authorization;
 import org.openhab.binding.proxmox.internal.api.auth.ProxmoxAuthentication;
@@ -24,10 +25,9 @@ import com.google.gson.Gson;
  *
  * @author Daniel Zupan - Initial contribution
  */
+@NonNullByDefault
 public class ProxmoxVEApiFactory {
     public static ProxmoxVEApi create(ProxmoxHostConfiguration config, HttpClient httpClient) {
-
-        // TODO use composition rather than inheritance
         Gson gson = GsonBuilderFactory.defaultBuilder().create();
         ProxmoxVEApiContext context = ProxmoxVEApiContext.of(config, httpClient, gson);
 

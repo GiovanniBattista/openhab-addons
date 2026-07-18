@@ -1,5 +1,5 @@
-/**
- * Copyright (c) 2010-2025 Contributors to the openHAB project
+/*
+ * Copyright (c) 2010-2026 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -41,6 +41,13 @@ public class ProxmoxBindingConstants {
 
     // List of all Channel ids
     public static final String CHANNEL_POWER = "power";
+    public static final String CHANNEL_STATUS = "status";
+    public static final String CHANNEL_CPU_LOAD = "cpu-load";
+    public static final String CHANNEL_MEMORY_USED = "memory-used";
+    public static final String CHANNEL_MEMORY_TOTAL = "memory-total";
+    public static final String CHANNEL_DISK_USED = "disk-used";
+    public static final String CHANNEL_DISK_TOTAL = "disk-total";
+    public static final String CHANNEL_UPTIME = "uptime";
 
     // List of all Properties
     public static final String PROPERTY_HOST_VERSION = "version";

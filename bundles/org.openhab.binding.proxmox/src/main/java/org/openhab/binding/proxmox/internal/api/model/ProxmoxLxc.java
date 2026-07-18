@@ -1,5 +1,5 @@
-/**
- * Copyright (c) 2010-2025 Contributors to the openHAB project
+/*
+ * Copyright (c) 2010-2026 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -12,6 +12,9 @@
  */
 package org.openhab.binding.proxmox.internal.api.model;
 
+import org.eclipse.jdt.annotation.NonNullByDefault;
+import org.eclipse.jdt.annotation.Nullable;
+
 import com.google.gson.annotations.SerializedName;
 
 /**
@@ -19,82 +22,107 @@ import com.google.gson.annotations.SerializedName;
  *
  * @author Daniel Zupan - Initial contribution
  */
+@NonNullByDefault
 public class ProxmoxLxc {
-    private VmStatus status;
+    private @Nullable VmStatus status;
 
     @SerializedName("vmid")
-    private String lxcId;
+    private @Nullable String lxcId;
+    private @Nullable String name;
+    private @Nullable String tags;
     private int cpus;
+    private float cpu;
+    private long mem;
+    @SerializedName("maxmem")
+    private long maxMem;
+    @SerializedName("maxswap")
+    private long maxSwap;
+    private long disk;
     @SerializedName("maxdisk")
     private long maxDisk;
-    @SerializedName("maxmem")
-    private int maxMem;
-    @SerializedName("maxswap")
-    private int maxSwap;
-    private String name;
-    private String tags;
-    private int uptime;
+    private long uptime;
 
     /**
      * @return the status
      */
-    public VmStatus getStatus() {
+    public @Nullable VmStatus getStatus() {
         return status;
     }
 
     /**
      * @return the lxcId
      */
-    public String getLxcId() {
+    public @Nullable String getLxcId() {
         return lxcId;
     }
 
     /**
-     * @return the cpus
+     * @return the number of assigned cpu cores
      */
     public int getCpus() {
         return cpus;
     }
 
     /**
-     * @return the maxDisk
+     * @return the current CPU usage as a fraction (0..1) of the assigned cores
+     */
+    public float getCpu() {
+        return cpu;
+    }
+
+    /**
+     * @return the currently used memory in bytes
+     */
+    public long getMem() {
+        return mem;
+    }
+
+    /**
+     * @return the maximum available memory in bytes
+     */
+    public long getMaxMem() {
+        return maxMem;
+    }
+
+    /**
+     * @return the maximum available swap in bytes
+     */
+    public long getMaxSwap() {
+        return maxSwap;
+    }
+
+    /**
+     * @return the currently used disk size in bytes
+     */
+    public long getDisk() {
+        return disk;
+    }
+
+    /**
+     * @return the maximum available disk size in bytes
      */
     public long getMaxDisk() {
         return maxDisk;
     }
 
     /**
-     * @return the maxMem
-     */
-    public int getMaxMem() {
-        return maxMem;
-    }
-
-    /**
-     * @return the maxSwap
-     */
-    public int getMaxSwap() {
-        return maxSwap;
-    }
-
-    /**
      * @return the name
      */
-    public String getName() {
+    public @Nullable String getName() {
         return name;
     }
 
     /**
      * @return the tags
      */
-    public String getTags() {
+    public @Nullable String getTags() {
         return tags;
     }
 
     /**
-     * @return the uptime
+     * @return the uptime in seconds
      */
-    public int getUptime() {
+    public long getUptime() {
         return uptime;
     }
 }

@@ -1,5 +1,5 @@
-/**
- * Copyright (c) 2010-2025 Contributors to the openHAB project
+/*
+ * Copyright (c) 2010-2026 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -14,17 +14,18 @@ package org.openhab.binding.proxmox.internal.handler;
 
 import static org.openhab.binding.proxmox.internal.ProxmoxBindingConstants.*;
 
-import org.eclipse.jdt.annotation.NonNull;
+import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
-import org.openhab.binding.proxmox.internal.ProxmoxBindingConstants;
 import org.openhab.binding.proxmox.internal.api.ProxmoxVEApi;
 import org.openhab.binding.proxmox.internal.api.exception.ProxmoxApiCommunicationException;
 import org.openhab.binding.proxmox.internal.api.exception.ProxmoxApiConfigurationException;
 import org.openhab.binding.proxmox.internal.api.model.NodeStatus;
 import org.openhab.binding.proxmox.internal.api.model.ProxmoxNode;
 import org.openhab.binding.proxmox.internal.api.model.StatusCommand;
-import org.openhab.binding.proxmox.internal.config.ProxmoxNodeConfiguration;
 import org.openhab.core.library.types.OnOffType;
+import org.openhab.core.library.types.QuantityType;
+import org.openhab.core.library.types.StringType;
+import org.openhab.core.library.unit.Units;
 import org.openhab.core.thing.Bridge;
 import org.openhab.core.thing.ChannelUID;
 import org.openhab.core.thing.Thing;
@@ -34,13 +35,16 @@ import org.openhab.core.thing.ThingStatusInfo;
 import org.openhab.core.thing.binding.BaseThingHandler;
 import org.openhab.core.types.Command;
 import org.openhab.core.types.RefreshType;
+import org.openhab.core.types.UnDefType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * @author Daniel Zupan - Initial contribution
+ * The {@link ProxmoxNodeHandler} is responsible for handling commands and state updates of a Proxmox node.
  *
+ * @author Daniel Zupan - Initial contribution
  */
+@NonNullByDefault
 public class ProxmoxNodeHandler extends BaseThingHandler implements ProxmoxStatusChangedListener<ProxmoxNode> {
 
     private final Logger logger = LoggerFactory.getLogger(ProxmoxNodeHandler.class);
@@ -48,14 +52,10 @@ public class ProxmoxNodeHandler extends BaseThingHandler implements ProxmoxStatu
     // The minimum time in ms to skip the next update cycle if a command has been issued.
     private static final int MIN_SKIP_UPDATE_CYCLE_TIME = 30000;
 
-    private volatile ProxmoxNodeConfiguration config;
     private volatile @Nullable String nodeName;
 
     private long endSkipTime = 0L;
 
-    /**
-     * @param thing
-     */
     public ProxmoxNodeHandler(Thing thing) {
         super(thing);
     }
@@ -65,14 +65,12 @@ public class ProxmoxNodeHandler extends BaseThingHandler implements ProxmoxStatu
         logger.debug("Initializing node handler.");
         updateStatus(ThingStatus.UNKNOWN);
 
-        config = getConfigAs(ProxmoxNodeConfiguration.class);
-
         Bridge bridge = getBridge();
         initializeNode(bridge != null ? bridge.getStatus() : null);
     }
 
     @Override
-    public void bridgeStatusChanged(@NonNull ThingStatusInfo bridgeStatusInfo) {
+    public void bridgeStatusChanged(ThingStatusInfo bridgeStatusInfo) {
         logger.debug("Bridge status changed to {}.", bridgeStatusInfo);
         initializeNode(bridgeStatusInfo.getStatus());
     }
@@ -80,8 +78,9 @@ public class ProxmoxNodeHandler extends BaseThingHandler implements ProxmoxStatu
     private void initializeNode(@Nullable ThingStatus bridgeStatus) {
         logger.debug("initializeNode: thing {} bridge status {}", getThing().getUID(), bridgeStatus);
 
-        nodeName = getThing().getProperties().get(PROPERTY_NODE_NAME);
-        if (nodeName == null) {
+        String node = getThing().getProperties().get(PROPERTY_NODE_NAME);
+        nodeName = node;
+        if (node == null) {
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR,
                     "Node name was not set as property!");
             return;
@@ -90,7 +89,7 @@ public class ProxmoxNodeHandler extends BaseThingHandler implements ProxmoxStatu
         ProxmoxHostBridgeHandler bridgeHandler = ProxmoxHostBridgeHandlerHelper.getBridgeHandler(getBridge());
         if (bridgeHandler != null) {
             if (bridgeStatus == ThingStatus.ONLINE) {
-                bridgeHandler.registerNodeStatusChangeListener(nodeName, this);
+                bridgeHandler.registerNodeStatusChangeListener(node, this);
                 updateStatus(ThingStatus.ONLINE);
             } else {
                 updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.BRIDGE_OFFLINE);
@@ -110,45 +109,46 @@ public class ProxmoxNodeHandler extends BaseThingHandler implements ProxmoxStatu
             return;
         }
 
-        if (nodeName == null) {
+        String node = nodeName;
+        if (node == null) {
             logger.debug("The node was not initialized properly. Cannot handle command!");
             return;
         }
 
         String channel = channelUID.getId();
-        ProxmoxNode node = bridgeHandler.getNodeById(nodeName);
-        if (node == null && !CHANNEL_POWER.equals(channel)) {
+        ProxmoxNode proxmoxNode = bridgeHandler.getNodeById(node);
+        if (proxmoxNode == null && !CHANNEL_POWER.equals(channel)) {
             logger.debug("The node is not known to the bridge. Cannot handle command!");
             return;
         }
 
-        if (command == RefreshType.REFRESH) {
+        if (command instanceof RefreshType) {
             refreshChannelStates();
             return;
         }
 
+        ProxmoxVEApi api = getApi();
+        if (api == null) {
+            logger.debug("The API is not available. Cannot handle command!");
+            return;
+        }
+
         try {
-            switch (channel) {
-                case CHANNEL_POWER:
-                    logger.trace("CHANNEL_POWER was changed to {}", command);
-                    if (command instanceof OnOffType) {
-                        OnOffType powerState = (OnOffType) command;
-                        if (powerState == OnOffType.OFF) {
-                            // node was requested to poweroff, therefore use POST /nodes/{node}/status to shut down
-                            // the node
-                            getApi().rebootShutdownNode(nodeName, StatusCommand.SHUTDOWN);
-                        } else if (powerState == OnOffType.ON) {
-                            if (getThing().getStatus() == ThingStatus.OFFLINE) {
-                                // try to wakeOnLan the host/bridge
-                                bridgeHandler.wakeOnLan(nodeName);
-                            } else {
-                                getApi().wakeonlanNode(nodeName);
-                            }
-                        }
-                        updateState(channel, powerState);
-                        skipNextUpdateCylce();
+            if (CHANNEL_POWER.equals(channel) && command instanceof OnOffType powerState) {
+                logger.trace("CHANNEL_POWER was changed to {}", command);
+                if (powerState == OnOffType.OFF) {
+                    // node was requested to power off, therefore use POST /nodes/{node}/status to shut down the node
+                    api.rebootShutdownNode(node, StatusCommand.SHUTDOWN);
+                } else {
+                    if (getThing().getStatus() == ThingStatus.OFFLINE) {
+                        // try to wake the host/bridge via Wake on LAN
+                        bridgeHandler.wakeOnLan(node);
+                    } else {
+                        api.wakeonlanNode(node);
                     }
-                    break;
+                }
+                updateState(channel, powerState);
+                skipNextUpdateCycle();
             }
         } catch (ProxmoxApiCommunicationException ex) {
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR, ex.getMessage());
@@ -158,16 +158,38 @@ public class ProxmoxNodeHandler extends BaseThingHandler implements ProxmoxStatu
     }
 
     private void refreshChannelStates() {
-        if (getThing().getStatus() == ThingStatus.OFFLINE) {
-            updateState(ProxmoxBindingConstants.CHANNEL_POWER, OnOffType.OFF);
+        if (getThing().getStatus() != ThingStatus.ONLINE) {
+            updateState(CHANNEL_POWER, OnOffType.OFF);
+            return;
+        }
+
+        ProxmoxHostBridgeHandler bridgeHandler = ProxmoxHostBridgeHandlerHelper.getBridgeHandler(getBridge());
+        String node = nodeName;
+        if (bridgeHandler != null && node != null) {
+            ProxmoxNode proxmoxNode = bridgeHandler.getNodeById(node);
+            if (proxmoxNode != null) {
+                updateChannels(proxmoxNode);
+            }
         }
     }
 
-    private void skipNextUpdateCylce() {
+    private void updateChannels(ProxmoxNode node) {
+        NodeStatus status = node.getStatus();
+        updateState(CHANNEL_STATUS, status != null ? new StringType(status.toString()) : UnDefType.UNDEF);
+        updateState(CHANNEL_POWER, OnOffType.from(status == NodeStatus.ONLINE));
+        updateState(CHANNEL_CPU_LOAD, new QuantityType<>(node.getCpu() * 100.0, Units.PERCENT));
+        updateState(CHANNEL_MEMORY_USED, new QuantityType<>(node.getMem(), Units.BYTE));
+        updateState(CHANNEL_MEMORY_TOTAL, new QuantityType<>(node.getMaxmem(), Units.BYTE));
+        updateState(CHANNEL_DISK_USED, new QuantityType<>(node.getDisk(), Units.BYTE));
+        updateState(CHANNEL_DISK_TOTAL, new QuantityType<>(node.getMaxdisk(), Units.BYTE));
+        updateState(CHANNEL_UPTIME, new QuantityType<>(node.getUptime(), Units.SECOND));
+    }
+
+    private void skipNextUpdateCycle() {
         endSkipTime = System.currentTimeMillis() + MIN_SKIP_UPDATE_CYCLE_TIME;
     }
 
-    private ProxmoxVEApi getApi() {
+    private @Nullable ProxmoxVEApi getApi() {
         return ProxmoxHostBridgeHandlerHelper.getApi(getBridge());
     }
 
@@ -176,17 +198,13 @@ public class ProxmoxNodeHandler extends BaseThingHandler implements ProxmoxStatu
         super.dispose();
 
         logger.debug("Node was disposed. Unregister listener.");
+        String node = nodeName;
         ProxmoxHostBridgeHandler bridgeHandler = ProxmoxHostBridgeHandlerHelper.getBridgeHandler(getBridge());
-        if (nodeName != null && bridgeHandler != null) {
-            bridgeHandler.unregisterNodeStatusChangeListener(nodeName);
+        if (node != null && bridgeHandler != null) {
+            bridgeHandler.unregisterNodeStatusChangeListener(node);
             nodeName = null;
         }
     }
-
-    // @Override
-    // public Collection<@NonNull Class<? extends @NonNull ThingHandlerService>> getServices() {
-    // return Collections.singleton(ProxmoxNodeAction.class);
-    // }
 
     // ========== ProxmoxStatusChangedListener implementation ===============================
 
@@ -199,8 +217,7 @@ public class ProxmoxNodeHandler extends BaseThingHandler implements ProxmoxStatu
             return false;
         }
 
-        updateState(CHANNEL_POWER, OnOffType.from(node.getStatus() == NodeStatus.ONLINE));
-
+        updateChannels(node);
         return true;
     }
 
@@ -211,7 +228,7 @@ public class ProxmoxNodeHandler extends BaseThingHandler implements ProxmoxStatu
 
     @Override
     public void onRemoved() {
-        updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.NONE, "@text/offline.node-removed");
+        updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.GONE, "@text/offline.node-removed");
     }
 
     @Override

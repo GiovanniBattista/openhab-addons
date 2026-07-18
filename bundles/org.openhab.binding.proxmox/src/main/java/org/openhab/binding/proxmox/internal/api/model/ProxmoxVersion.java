@@ -1,5 +1,5 @@
-/**
- * Copyright (c) 2010-2025 Contributors to the openHAB project
+/*
+ * Copyright (c) 2010-2026 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -12,32 +12,36 @@
  */
 package org.openhab.binding.proxmox.internal.api.model;
 
+import org.eclipse.jdt.annotation.NonNullByDefault;
+import org.eclipse.jdt.annotation.Nullable;
+
 /**
  * @author Daniel Zupan - Initial contribution
  */
+@NonNullByDefault
 public class ProxmoxVersion {
-    private String release;
-    private String repoid;
-    private String version;
+    private @Nullable String release;
+    private @Nullable String repoid;
+    private @Nullable String version;
 
     /**
      * @return the release
      */
-    public String getRelease() {
+    public @Nullable String getRelease() {
         return release;
     }
 
     /**
      * @return the version
      */
-    public String getVersion() {
+    public @Nullable String getVersion() {
         return version;
     }
 
     /**
      * @return the repoid
      */
-    public String getRepoid() {
+    public @Nullable String getRepoid() {
         return repoid;
     }
 }

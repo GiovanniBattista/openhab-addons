@@ -1,5 +1,5 @@
-/**
- * Copyright (c) 2010-2025 Contributors to the openHAB project
+/*
+ * Copyright (c) 2010-2026 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -12,36 +12,43 @@
  */
 package org.openhab.binding.proxmox.internal.api.model;
 
+import org.eclipse.jdt.annotation.NonNullByDefault;
+import org.eclipse.jdt.annotation.Nullable;
+
 /**
  * @author Daniel Zupan - Initial contribution
- *
  */
+@NonNullByDefault
 public class ProxmoxVm {
-    private VmStatus status;
-    private String vmid;
-    private String name;
+    private @Nullable VmStatus status;
+    private @Nullable String vmid;
+    private @Nullable String name;
+    private @Nullable String tags;
     private int pid;
-    private String tags;
-    private int uptime;
+    private long uptime;
+    private float cpu;
+    private long mem;
+    private long maxmem;
+    private long maxdisk;
 
     /**
      * @return the status
      */
-    public VmStatus getStatus() {
+    public @Nullable VmStatus getStatus() {
         return status;
     }
 
     /**
      * @return the vmid
      */
-    public String getVmid() {
+    public @Nullable String getVmid() {
         return vmid;
     }
 
     /**
      * @return the name
      */
-    public String getName() {
+    public @Nullable String getName() {
         return name;
     }
 
@@ -55,14 +62,42 @@ public class ProxmoxVm {
     /**
      * @return the tags
      */
-    public String getTags() {
+    public @Nullable String getTags() {
         return tags;
     }
 
     /**
-     * @return the uptime
+     * @return the uptime in seconds
      */
-    public int getUptime() {
+    public long getUptime() {
         return uptime;
+    }
+
+    /**
+     * @return the current CPU usage as a fraction (0..1) of the assigned cores
+     */
+    public float getCpu() {
+        return cpu;
+    }
+
+    /**
+     * @return the currently used memory in bytes
+     */
+    public long getMem() {
+        return mem;
+    }
+
+    /**
+     * @return the maximum available memory in bytes
+     */
+    public long getMaxmem() {
+        return maxmem;
+    }
+
+    /**
+     * @return the maximum available disk size in bytes
+     */
+    public long getMaxdisk() {
+        return maxdisk;
     }
 }

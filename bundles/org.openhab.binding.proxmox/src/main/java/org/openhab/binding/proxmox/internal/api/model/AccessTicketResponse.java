@@ -1,5 +1,5 @@
-/**
- * Copyright (c) 2010-2025 Contributors to the openHAB project
+/*
+ * Copyright (c) 2010-2026 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -14,6 +14,9 @@ package org.openhab.binding.proxmox.internal.api.model;
 
 import java.time.LocalDateTime;
 
+import org.eclipse.jdt.annotation.NonNullByDefault;
+import org.eclipse.jdt.annotation.Nullable;
+
 import com.google.gson.annotations.SerializedName;
 
 /**
@@ -21,15 +24,16 @@ import com.google.gson.annotations.SerializedName;
  *
  * @author Daniel Zupan - Initial contribution
  */
+@NonNullByDefault
 public class AccessTicketResponse {
 
     @SerializedName("CSRFPreventionToken")
-    private String csrfPreventionToken;
+    private @Nullable String csrfPreventionToken;
     @SerializedName("clustername")
-    private String clusterName;
-    private String ticket;
+    private @Nullable String clusterName;
+    private @Nullable String ticket;
 
-    private transient final LocalDateTime tokenExpiration;
+    private final transient LocalDateTime tokenExpiration;
 
     public AccessTicketResponse() {
         super();
@@ -41,15 +45,15 @@ public class AccessTicketResponse {
         tokenExpiration = LocalDateTime.now().plusHours(2);
     }
 
-    public String getCsrfPreventionToken() {
+    public @Nullable String getCsrfPreventionToken() {
         return csrfPreventionToken;
     }
 
-    public String getClusterName() {
+    public @Nullable String getClusterName() {
         return clusterName;
     }
 
-    public String getTicket() {
+    public @Nullable String getTicket() {
         return ticket;
     }
 

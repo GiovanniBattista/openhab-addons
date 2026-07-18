@@ -1,5 +1,5 @@
-/**
- * Copyright (c) 2010-2025 Contributors to the openHAB project
+/*
+ * Copyright (c) 2010-2026 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -12,22 +12,23 @@
  */
 package org.openhab.binding.proxmox.internal.handler;
 
-import static org.openhab.binding.proxmox.internal.ProxmoxBindingConstants.CONFIG_MAC_ADDRESS;
+import static org.openhab.binding.proxmox.internal.ProxmoxBindingConstants.*;
 
 import java.net.InetAddress;
 import java.net.MalformedURLException;
-import java.net.URL;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.UnknownHostException;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.locks.ReentrantLock;
 
-import org.eclipse.jdt.annotation.NonNull;
+import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.eclipse.jetty.client.HttpClient;
 import org.openhab.binding.proxmox.internal.api.ProxmoxVEApi;
@@ -36,6 +37,7 @@ import org.openhab.binding.proxmox.internal.api.exception.ProxmoxApiCommunicatio
 import org.openhab.binding.proxmox.internal.api.exception.ProxmoxApiConfigurationException;
 import org.openhab.binding.proxmox.internal.api.model.ProxmoxLxc;
 import org.openhab.binding.proxmox.internal.api.model.ProxmoxNode;
+import org.openhab.binding.proxmox.internal.api.model.ProxmoxVersion;
 import org.openhab.binding.proxmox.internal.api.model.ProxmoxVm;
 import org.openhab.binding.proxmox.internal.config.ProxmoxHostConfiguration;
 import org.openhab.binding.proxmox.internal.discovery.ProxmoxDiscoveryService;
@@ -52,20 +54,23 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * ProxmoxHostBridgeHandler
+ * The {@link ProxmoxHostBridgeHandler} connects to a Proxmox VE host, polls it for the state of all
+ * nodes, VMs and containers and fans the results out to the registered child thing handlers.
  *
  * @author Daniel Zupan - Initial contribution
  */
+@NonNullByDefault
 public class ProxmoxHostBridgeHandler extends BaseBridgeHandler {
 
     private final Logger logger = LoggerFactory.getLogger(ProxmoxHostBridgeHandler.class);
 
     private static final int WOL_PACKET_RETRY_COUNT = 10;
     private static final int WOL_PACKET_RETRY_DELAY_MILLIS = 100;
+    private static final int DEFAULT_POLLING_INTERVAL = 30;
 
-    private volatile ProxmoxHostConfiguration config;
-    private volatile ProxmoxVEApi api;
-    private HttpClient httpClient;
+    private volatile ProxmoxHostConfiguration config = new ProxmoxHostConfiguration();
+    private volatile @Nullable ProxmoxVEApi api;
+    private final HttpClient httpClient;
 
     private final Map<String, ProxmoxNode> lastNodeStates = new ConcurrentHashMap<>();
     private final Map<String, ProxmoxVm> lastVmStates = new ConcurrentHashMap<>();
@@ -76,13 +81,11 @@ public class ProxmoxHostBridgeHandler extends BaseBridgeHandler {
     private final Map<String, ProxmoxStatusChangedListener<ProxmoxVm>> vmStatusListeners = new ConcurrentHashMap<>();
     private final Map<String, ProxmoxStatusChangedListener<ProxmoxLxc>> lxcStatusListeners = new ConcurrentHashMap<>();
 
-    private boolean bridgeConnectedToHost = false;
-    final ReentrantLock pollingLock = new ReentrantLock();
+    private final ReentrantLock pollingLock = new ReentrantLock();
     private @Nullable ScheduledFuture<?> proxmoxPollingJob;
 
     public ProxmoxHostBridgeHandler(Bridge bridge, HttpClient httpClient) {
         super(bridge);
-
         this.httpClient = httpClient;
     }
 
@@ -90,64 +93,48 @@ public class ProxmoxHostBridgeHandler extends BaseBridgeHandler {
     public void initialize() {
         logger.debug("Initializing host bridge handler");
 
-        config = getConfigAs(ProxmoxHostConfiguration.class);
-        api = ProxmoxVEApiFactory.create(config, httpClient);
+        ProxmoxHostConfiguration config = getConfigAs(ProxmoxHostConfiguration.class);
+        this.config = config;
+        this.api = ProxmoxVEApiFactory.create(config, httpClient);
 
-        // Note: When initialization can NOT be done set the status with more details for further
-        // analysis. See also class ThingStatusDetail for all available status details.
-        // Add a description to give user information to understand why thing does not work as expected. E.g.
-        // updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR,
-        // "Can not access device as username and/or password are invalid");
-
-        if (config.getBaseUrl() == null || config.getBaseUrl().isEmpty()) {
+        String baseUrl = config.getBaseUrl();
+        if (baseUrl == null || baseUrl.isEmpty()) {
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR, "No base url set");
             return;
         }
 
         try {
-            new URL(config.getBaseUrl());
-        } catch (MalformedURLException ex) {
+            new URI(baseUrl).toURL();
+        } catch (URISyntaxException | MalformedURLException | IllegalArgumentException ex) {
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR,
                     "Invalid base url: " + ex.getMessage());
             return;
         }
 
-        if (config.getUsername() == null || config.getUsername().isEmpty()) {
+        String username = config.getUsername();
+        if (username == null || username.isEmpty()) {
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR, "No username set");
             return;
         }
 
-        if (config.getPassword() == null || config.getPassword().isEmpty()) {
+        String password = config.getPassword();
+        if (password == null || password.isEmpty()) {
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR, "No password set");
             return;
         }
 
-        // The framework requires you to return from this method quickly. Also, before leaving this method a thing
-        // status from one of ONLINE, OFFLINE or UNKNOWN must be set. This might already be the real thing status in
-        // case you can decide it directly.
-        // In case you can not decide the thing status directly (e.g. for long running connection handshake using WAN
-        // access or similar) you should set status UNKNOWN here and then decide the real status asynchronously in the
-        // background.
-
-        // set the thing status to UNKNOWN temporarily and let the background task decide for the real status.
-        // the framework is then able to reuse the resources from the thing handler initialization.
-        // we set this upfront to reliably check status updates in unit tests.
+        // Set the thing status to UNKNOWN temporarily and let the background polling task decide the real status.
         updateStatus(ThingStatus.UNKNOWN);
 
         startProxmoxPolling();
-
-        // These logging types should be primarily used by bindings
-        // logger.trace("Example trace message");
-        // logger.debug("Example debug message");
-        // logger.warn("Example warn message");
     }
 
     private void startProxmoxPolling() {
         ScheduledFuture<?> job = proxmoxPollingJob;
         if (job == null || job.isCancelled()) {
-            long pollingInterval = config.getPollingInterval();
+            int pollingInterval = config.getPollingInterval();
             if (pollingInterval < 1) {
-                pollingInterval = 30;
+                pollingInterval = DEFAULT_POLLING_INTERVAL;
                 logger.warn("Wrong configuration value for polling interval. Using default value: {}s",
                         pollingInterval);
             }
@@ -172,34 +159,31 @@ public class ProxmoxHostBridgeHandler extends BaseBridgeHandler {
     @Override
     public void dispose() {
         super.dispose();
-
         stopProxmoxPolling();
     }
 
-    public ProxmoxVEApi getApi() {
+    public @Nullable ProxmoxVEApi getApi() {
         return api;
     }
 
     abstract class AbstractPoller implements Runnable {
         @Override
         public void run() {
+            pollingLock.lock();
             try {
-                pollingLock.lock();
+                fetchStatusUpdates();
 
-                try {
-                    fetchStatusUpdates();
-
-                    if (thing.getStatus() != ThingStatus.ONLINE) {
-                        findMacAddress();
-                        updateStatus(ThingStatus.ONLINE);
-                    }
-                } catch (ProxmoxApiCommunicationException e) {
-                    updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR, e.getMessage());
-                } catch (ProxmoxApiConfigurationException e) {
-                    updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR, e.getMessage());
-                } catch (Exception e) {
-                    updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR, e.getMessage());
+                if (thing.getStatus() != ThingStatus.ONLINE) {
+                    findMacAddress();
+                    updateVersionProperty();
+                    updateStatus(ThingStatus.ONLINE);
                 }
+            } catch (ProxmoxApiCommunicationException e) {
+                updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR, e.getMessage());
+            } catch (ProxmoxApiConfigurationException e) {
+                updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR, e.getMessage());
+            } catch (RuntimeException e) {
+                updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR, e.getMessage());
             } finally {
                 pollingLock.unlock();
             }
@@ -213,13 +197,21 @@ public class ProxmoxHostBridgeHandler extends BaseBridgeHandler {
 
         @Override
         protected void fetchStatusUpdates() throws ProxmoxApiCommunicationException, ProxmoxApiConfigurationException {
+            ProxmoxVEApi api = getApi();
+            if (api == null) {
+                throw new ProxmoxApiCommunicationException("API is not initialized");
+            }
+
             Map<String, ProxmoxNode> lastNodeStatesCopy = new HashMap<>(lastNodeStates);
             Map<String, ProxmoxVm> lastVmStatesCopy = new HashMap<>(lastVmStates);
             Map<String, ProxmoxLxc> lastLxcStatesCopy = new HashMap<>(lastLxcStates);
 
             final ProxmoxDiscoveryService discovery = discoveryService;
-            for (ProxmoxNode node : getApi().getNodes()) {
+            for (ProxmoxNode node : api.getNodes()) {
                 String id = node.getNode();
+                if (id == null) {
+                    continue;
+                }
 
                 ProxmoxStatusChangedListener<ProxmoxNode> nodeStatusListener = nodeStatusListeners.get(id);
                 if (nodeStatusListener == null) {
@@ -238,8 +230,8 @@ public class ProxmoxHostBridgeHandler extends BaseBridgeHandler {
                 // node was handled, so remove it from the copy (if this node exists)
                 lastNodeStatesCopy.remove(id);
 
-                fetchstatusUpdates4VMs(node, lastVmStatesCopy);
-                fetchStatusUpdates4LXCs(node, lastLxcStatesCopy);
+                fetchStatusUpdates4VMs(api, node, lastVmStatesCopy);
+                fetchStatusUpdates4LXCs(api, node, lastLxcStatesCopy);
             }
 
             // the remaining nodes in lastNodeStatesCopy were not handled, thus have to be removed
@@ -252,7 +244,7 @@ public class ProxmoxHostBridgeHandler extends BaseBridgeHandler {
                     statusListener.onRemoved();
                 }
 
-                if (discovery != null && node != null) {
+                if (discovery != null) {
                     discovery.removeDiscoveredNode(node);
                 }
             });
@@ -267,7 +259,7 @@ public class ProxmoxHostBridgeHandler extends BaseBridgeHandler {
                     statusListener.onRemoved();
                 }
 
-                if (discovery != null && vm != null) {
+                if (discovery != null) {
                     discovery.removeDiscoveredVM(vm);
                 }
             });
@@ -282,18 +274,21 @@ public class ProxmoxHostBridgeHandler extends BaseBridgeHandler {
                     statusListener.onRemoved();
                 }
 
-                if (discovery != null && lxc != null) {
+                if (discovery != null) {
                     discovery.removeDiscoveredLxc(lxc);
                 }
             });
         }
 
-        private void fetchstatusUpdates4VMs(ProxmoxNode node, Map<String, ProxmoxVm> lastVMStatesCopy)
+        private void fetchStatusUpdates4VMs(ProxmoxVEApi api, ProxmoxNode node, Map<String, ProxmoxVm> lastVMStatesCopy)
                 throws ProxmoxApiCommunicationException, ProxmoxApiConfigurationException {
 
             final ProxmoxDiscoveryService discovery = discoveryService;
-            for (ProxmoxVm vm : getApi().getVMs(node)) {
+            for (ProxmoxVm vm : api.getVMs(node)) {
                 String id = vm.getVmid();
+                if (id == null) {
+                    continue;
+                }
 
                 ProxmoxStatusChangedListener<ProxmoxVm> vmStatusListener = vmStatusListeners.get(id);
                 if (vmStatusListener == null) {
@@ -309,17 +304,21 @@ public class ProxmoxHostBridgeHandler extends BaseBridgeHandler {
                         lastVmStates.put(id, vm);
                     }
                 }
-                // VM was handled, so remove it from the copy (if this node exists)
+                // VM was handled, so remove it from the copy (if this VM exists)
                 lastVMStatesCopy.remove(id);
             }
         }
 
-        private void fetchStatusUpdates4LXCs(ProxmoxNode node, Map<String, ProxmoxLxc> lastLxcStatesCopy)
+        private void fetchStatusUpdates4LXCs(ProxmoxVEApi api, ProxmoxNode node,
+                Map<String, ProxmoxLxc> lastLxcStatesCopy)
                 throws ProxmoxApiCommunicationException, ProxmoxApiConfigurationException {
 
             final ProxmoxDiscoveryService discovery = discoveryService;
-            for (ProxmoxLxc lxc : getApi().getLXCs(node)) {
+            for (ProxmoxLxc lxc : api.getLXCs(node)) {
                 String id = lxc.getLxcId();
+                if (id == null) {
+                    continue;
+                }
 
                 ProxmoxStatusChangedListener<ProxmoxLxc> lxcStatusListener = lxcStatusListeners.get(id);
                 if (lxcStatusListener == null) {
@@ -335,7 +334,7 @@ public class ProxmoxHostBridgeHandler extends BaseBridgeHandler {
                         lastLxcStates.put(id, lxc);
                     }
                 }
-                // LXC was handled, so remove it from the copy (if this node exists)
+                // LXC was handled, so remove it from the copy (if this LXC exists)
                 lastLxcStatesCopy.remove(id);
             }
         }
@@ -345,23 +344,42 @@ public class ProxmoxHostBridgeHandler extends BaseBridgeHandler {
         return lastNodeStates.get(nodeId);
     }
 
+    private void updateVersionProperty() {
+        ProxmoxVEApi localApi = api;
+        if (localApi == null) {
+            return;
+        }
+        try {
+            ProxmoxVersion version = localApi.getVersion();
+            String versionString = version.getVersion();
+            if (versionString != null) {
+                updateProperty(PROPERTY_HOST_VERSION, versionString);
+            }
+        } catch (ProxmoxApiCommunicationException | ProxmoxApiConfigurationException e) {
+            logger.debug("Unable to determine Proxmox VE version: {}", e.getMessage());
+        }
+    }
+
     public void findMacAddress() {
-        if (config.getBaseUrl() == null || config.getBaseUrl().isEmpty()) {
+        String baseUrl = config.getBaseUrl();
+        if (baseUrl == null || baseUrl.isEmpty()) {
             return;
         }
 
         try {
-            URL baseUrl = new URL(config.getBaseUrl());
-            String host = baseUrl.getHost();
+            String host = new URI(baseUrl).getHost();
+            if (host == null) {
+                return;
+            }
             String macAddress = WakeOnLanUtility.getMACAddress(InetAddress.getByName(host).getHostAddress());
             if (macAddress != null && !macAddress.equals(config.getMacAddress())) {
                 config.setMacAddress(macAddress);
 
-                Configuration config = editConfiguration();
-                config.put(CONFIG_MAC_ADDRESS, macAddress);
-                updateConfiguration(config);
+                Configuration configuration = editConfiguration();
+                configuration.put(CONFIG_MAC_ADDRESS, macAddress);
+                updateConfiguration(configuration);
             }
-        } catch (MalformedURLException | UnknownHostException e) {
+        } catch (URISyntaxException | UnknownHostException e) {
             logger.debug("Unable to determine MAC address: {}", e.getMessage());
         }
     }
@@ -420,8 +438,8 @@ public class ProxmoxHostBridgeHandler extends BaseBridgeHandler {
     }
 
     @Override
-    public Collection<@NonNull Class<? extends @NonNull ThingHandlerService>> getServices() {
-        return Collections.singleton(ProxmoxDiscoveryService.class);
+    public Collection<Class<? extends ThingHandlerService>> getServices() {
+        return Set.of(ProxmoxDiscoveryService.class);
     }
 
     public void registerDiscoveryListener(ProxmoxDiscoveryService proxmoxDiscoveryService) {
@@ -433,18 +451,19 @@ public class ProxmoxHostBridgeHandler extends BaseBridgeHandler {
     public void wakeOnLan(String nodeName) {
         String macAddress = config.getMacAddress();
         if (macAddress == null || macAddress.isEmpty()) {
-            logger.debug("ON command for Node '{}' was triggered. Cannot use the Proxmox API because the Host is down."
-                    + "Trying to wake up the host which should also power the Node, but the MAC address needs to be set in the Thing configuration for this to work.",
-                    nodeName);
+            logger.debug("ON command for Node '{}' was triggered. Cannot use the Proxmox API because the host is down. "
+                    + "Trying to wake up the host which should also power the node, but the MAC address needs to be set "
+                    + "in the thing configuration for this to work.", nodeName);
         } else {
+            String mac = macAddress;
             for (int i = 0; i < WOL_PACKET_RETRY_COUNT; i++) {
                 scheduler.schedule(() -> {
                     try {
-                        WakeOnLanUtility.sendWOLPacket(macAddress);
+                        WakeOnLanUtility.sendWOLPacket(mac);
                     } catch (IllegalArgumentException ex) {
                         logger.debug("Failed to send WOL packet: {}", ex.getMessage());
                     }
-                }, i * WOL_PACKET_RETRY_DELAY_MILLIS, TimeUnit.MILLISECONDS);
+                }, (long) i * WOL_PACKET_RETRY_DELAY_MILLIS, TimeUnit.MILLISECONDS);
             }
         }
     }

@@ -1,5 +1,5 @@
-/**
- * Copyright (c) 2010-2025 Contributors to the openHAB project
+/*
+ * Copyright (c) 2010-2026 Contributors to the openHAB project
  *
  * See the NOTICE file(s) distributed with this work for additional
  * information.
@@ -14,15 +14,17 @@ package org.openhab.binding.proxmox.internal.handler;
 
 import static org.openhab.binding.proxmox.internal.ProxmoxBindingConstants.*;
 
+import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
-import org.openhab.binding.proxmox.internal.ProxmoxBindingConstants;
 import org.openhab.binding.proxmox.internal.api.ProxmoxVEApi;
 import org.openhab.binding.proxmox.internal.api.exception.ProxmoxApiCommunicationException;
 import org.openhab.binding.proxmox.internal.api.exception.ProxmoxApiConfigurationException;
 import org.openhab.binding.proxmox.internal.api.model.ProxmoxVm;
 import org.openhab.binding.proxmox.internal.api.model.VmStatus;
-import org.openhab.binding.proxmox.internal.config.ProxmoxVmConfiguration;
 import org.openhab.core.library.types.OnOffType;
+import org.openhab.core.library.types.QuantityType;
+import org.openhab.core.library.types.StringType;
+import org.openhab.core.library.unit.Units;
 import org.openhab.core.thing.Bridge;
 import org.openhab.core.thing.ChannelUID;
 import org.openhab.core.thing.Thing;
@@ -32,12 +34,16 @@ import org.openhab.core.thing.ThingStatusInfo;
 import org.openhab.core.thing.binding.BaseThingHandler;
 import org.openhab.core.types.Command;
 import org.openhab.core.types.RefreshType;
+import org.openhab.core.types.UnDefType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
+ * The {@link ProxmoxVmHandler} is responsible for handling commands and state updates of a Proxmox QEMU VM.
+ *
  * @author Daniel Zupan - Initial contribution
  */
+@NonNullByDefault
 public class ProxmoxVmHandler extends BaseThingHandler implements ProxmoxStatusChangedListener<ProxmoxVm> {
 
     private final Logger logger = LoggerFactory.getLogger(ProxmoxVmHandler.class);
@@ -45,7 +51,6 @@ public class ProxmoxVmHandler extends BaseThingHandler implements ProxmoxStatusC
     // The minimum time in ms to skip the next update cycle if a command has been issued.
     private static final int MIN_SKIP_UPDATE_CYCLE_TIME = 10000;
 
-    private volatile ProxmoxVmConfiguration config;
     private volatile @Nullable String nodeName;
     private volatile @Nullable String vmId;
 
@@ -60,30 +65,30 @@ public class ProxmoxVmHandler extends BaseThingHandler implements ProxmoxStatusC
         logger.debug("Initializing vm handler.");
         updateStatus(ThingStatus.UNKNOWN);
 
-        config = getConfigAs(ProxmoxVmConfiguration.class);
-
         Bridge bridge = getBridge();
         initializeVm(bridge != null ? bridge.getStatus() : null);
     }
 
     @Override
     public void bridgeStatusChanged(ThingStatusInfo bridgeStatusInfo) {
-        logger.info("Bridge status changed to {}", bridgeStatusInfo);
+        logger.debug("Bridge status changed to {}", bridgeStatusInfo);
         initializeVm(bridgeStatusInfo.getStatus());
     }
 
     private void initializeVm(@Nullable ThingStatus bridgeStatus) {
-        logger.debug("initializeVm: thing{} bridge status {}", getThing().getUID(), bridgeStatus);
+        logger.debug("initializeVm: thing {} bridge status {}", getThing().getUID(), bridgeStatus);
 
-        nodeName = getThing().getProperties().get(PROPERTY_VM_NODE);
-        if (nodeName == null) {
+        String node = getThing().getProperties().get(PROPERTY_VM_NODE);
+        nodeName = node;
+        if (node == null) {
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR,
                     "Node name was not set as property");
             return;
         }
 
-        vmId = getThing().getProperties().get(PROPERTY_VM_ID);
-        if (vmId == null) {
+        String id = getThing().getProperties().get(PROPERTY_VM_ID);
+        vmId = id;
+        if (id == null) {
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR, "VM ID was not set as property");
             return;
         }
@@ -91,7 +96,7 @@ public class ProxmoxVmHandler extends BaseThingHandler implements ProxmoxStatusC
         ProxmoxHostBridgeHandler bridgeHandler = ProxmoxHostBridgeHandlerHelper.getBridgeHandler(getBridge());
         if (bridgeHandler != null) {
             if (bridgeStatus == ThingStatus.ONLINE) {
-                bridgeHandler.registerVmStatusChangeListener(vmId, this);
+                bridgeHandler.registerVmStatusChangeListener(id, this);
                 updateStatus(ThingStatus.ONLINE);
             } else {
                 updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.BRIDGE_OFFLINE);
@@ -99,12 +104,6 @@ public class ProxmoxVmHandler extends BaseThingHandler implements ProxmoxStatusC
             }
         } else {
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.BRIDGE_UNINITIALIZED);
-        }
-    }
-
-    private void refreshChannelStates() {
-        if (getThing().getStatus() == ThingStatus.OFFLINE) {
-            updateState(ProxmoxBindingConstants.CHANNEL_POWER, OnOffType.OFF);
         }
     }
 
@@ -116,42 +115,41 @@ public class ProxmoxVmHandler extends BaseThingHandler implements ProxmoxStatusC
             return;
         }
 
-        if (vmId == null) {
-            logger.debug("The VM was not initialized properly: Missing VM ID. Cannot handle command!");
+        String id = vmId;
+        String node = nodeName;
+        if (id == null || node == null) {
+            logger.debug("The VM was not initialized properly. Cannot handle command!");
             return;
         }
 
-        if (nodeName == null) {
-            logger.debug("The VM was not initialized properly: Missing node name. Cannot handle command!");
-            return;
-        }
-
-        ProxmoxVm vm = bridgeHandler.getVmById(vmId);
+        ProxmoxVm vm = bridgeHandler.getVmById(id);
         if (vm == null) {
             logger.debug("The VM is not known to the bridge. Cannot handle command!");
             return;
         }
 
-        if (command == RefreshType.REFRESH) {
+        if (command instanceof RefreshType) {
             refreshChannelStates();
+            return;
+        }
+
+        ProxmoxVEApi api = getApi();
+        if (api == null) {
+            logger.debug("The API is not available. Cannot handle command!");
             return;
         }
 
         try {
             String channel = channelUID.getId();
-            switch (channel) {
-                case CHANNEL_POWER:
-                    logger.trace("CHANNEL_POWER was changed to {}", command);
-                    if (command instanceof OnOffType) {
-                        OnOffType powerState = (OnOffType) command;
-                        if (powerState == OnOffType.OFF) {
-                            getApi().shutdownVm(nodeName, vmId);
-                        } else if (powerState == OnOffType.ON) {
-                            getApi().startVm(nodeName, vmId);
-                        }
-                        updateState(channel, powerState);
-                        skipNextUpdateCylce();
-                    }
+            if (CHANNEL_POWER.equals(channel) && command instanceof OnOffType powerState) {
+                logger.trace("CHANNEL_POWER was changed to {}", command);
+                if (powerState == OnOffType.OFF) {
+                    api.shutdownVm(node, id);
+                } else {
+                    api.startVm(node, id);
+                }
+                updateState(channel, powerState);
+                skipNextUpdateCycle();
             }
         } catch (ProxmoxApiCommunicationException ex) {
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR, ex.getMessage());
@@ -160,24 +158,52 @@ public class ProxmoxVmHandler extends BaseThingHandler implements ProxmoxStatusC
         }
     }
 
+    private void refreshChannelStates() {
+        if (getThing().getStatus() != ThingStatus.ONLINE) {
+            updateState(CHANNEL_POWER, OnOffType.OFF);
+            return;
+        }
+
+        ProxmoxHostBridgeHandler bridgeHandler = ProxmoxHostBridgeHandlerHelper.getBridgeHandler(getBridge());
+        String id = vmId;
+        if (bridgeHandler != null && id != null) {
+            ProxmoxVm vm = bridgeHandler.getVmById(id);
+            if (vm != null) {
+                updateChannels(vm);
+            }
+        }
+    }
+
+    private void updateChannels(ProxmoxVm vm) {
+        VmStatus status = vm.getStatus();
+        updateState(CHANNEL_STATUS, status != null ? new StringType(status.toString()) : UnDefType.UNDEF);
+        updateState(CHANNEL_POWER, OnOffType.from(status == VmStatus.RUNNING));
+        updateState(CHANNEL_CPU_LOAD, new QuantityType<>(vm.getCpu() * 100.0, Units.PERCENT));
+        updateState(CHANNEL_MEMORY_USED, new QuantityType<>(vm.getMem(), Units.BYTE));
+        updateState(CHANNEL_MEMORY_TOTAL, new QuantityType<>(vm.getMaxmem(), Units.BYTE));
+        updateState(CHANNEL_DISK_TOTAL, new QuantityType<>(vm.getMaxdisk(), Units.BYTE));
+        updateState(CHANNEL_UPTIME, new QuantityType<>(vm.getUptime(), Units.SECOND));
+    }
+
     @Override
     public void dispose() {
         super.dispose();
 
         logger.debug("VM was disposed. Unregister listener.");
+        String id = vmId;
         ProxmoxHostBridgeHandler bridgeHandler = ProxmoxHostBridgeHandlerHelper.getBridgeHandler(getBridge());
-        if (vmId != null && bridgeHandler != null) {
-            bridgeHandler.unregisterVmStatusChangeListener(vmId);
+        if (id != null && bridgeHandler != null) {
+            bridgeHandler.unregisterVmStatusChangeListener(id);
             vmId = null;
             nodeName = null;
         }
     }
 
-    private void skipNextUpdateCylce() {
+    private void skipNextUpdateCycle() {
         endSkipTime = System.currentTimeMillis() + MIN_SKIP_UPDATE_CYCLE_TIME;
     }
 
-    private ProxmoxVEApi getApi() {
+    private @Nullable ProxmoxVEApi getApi() {
         return ProxmoxHostBridgeHandlerHelper.getApi(getBridge());
     }
 
@@ -191,8 +217,7 @@ public class ProxmoxVmHandler extends BaseThingHandler implements ProxmoxStatusC
             return false;
         }
 
-        updateState(CHANNEL_POWER, OnOffType.from(vm.getStatus() == VmStatus.RUNNING));
-
+        updateChannels(vm);
         return true;
     }
 
@@ -203,11 +228,11 @@ public class ProxmoxVmHandler extends BaseThingHandler implements ProxmoxStatusC
 
     @Override
     public void onRemoved() {
-        updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.NONE, "VM was removed");
+        updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.GONE, "@text/offline.vm-removed");
     }
 
     @Override
     public void onGone() {
-        updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.GONE, "VM gone");
+        updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.GONE, "@text/offline.vm-gone");
     }
 }
