@@ -87,6 +87,7 @@ public class ProxmoxHostBridgeHandler extends BaseBridgeHandler {
 
     private final ReentrantLock pollingLock = new ReentrantLock();
     private @Nullable ScheduledFuture<?> proxmoxPollingJob;
+    private volatile boolean macAddressDetectionDone = false;
 
     public ProxmoxHostBridgeHandler(Bridge bridge, HttpClientFactory httpClientFactory) {
         super(bridge);
@@ -216,9 +217,9 @@ public class ProxmoxHostBridgeHandler extends BaseBridgeHandler {
                 fetchStatusUpdates();
 
                 if (thing.getStatus() != ThingStatus.ONLINE) {
-                    findMacAddress();
                     updateVersionProperty();
                     updateStatus(ThingStatus.ONLINE);
+                    scheduleMacAddressDetection();
                 }
             } catch (ProxmoxApiCommunicationException e) {
                 updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR, e.getMessage());
@@ -402,7 +403,25 @@ public class ProxmoxHostBridgeHandler extends BaseBridgeHandler {
         }
     }
 
-    public void findMacAddress() {
+    /**
+     * Triggers a one-time, asynchronous auto-detection of the host MAC address. Detection uses a blocking {@code arp}
+     * call, so it must not run on the polling thread. It is skipped entirely when the user has configured a MAC address
+     * manually and runs at most once per handler lifecycle.
+     */
+    private void scheduleMacAddressDetection() {
+        if (macAddressDetectionDone) {
+            return;
+        }
+        macAddressDetectionDone = true;
+
+        String configured = config.getMacAddress();
+        if (configured != null && !configured.isEmpty()) {
+            return;
+        }
+        scheduler.execute(this::detectAndStoreMacAddress);
+    }
+
+    private void detectAndStoreMacAddress() {
         String baseUrl = config.getBaseUrl();
         if (baseUrl == null || baseUrl.isEmpty()) {
             return;
@@ -415,8 +434,6 @@ public class ProxmoxHostBridgeHandler extends BaseBridgeHandler {
             }
             String macAddress = WakeOnLanUtility.getMACAddress(InetAddress.getByName(host).getHostAddress());
             if (macAddress != null && !macAddress.equals(config.getMacAddress())) {
-                config.setMacAddress(macAddress);
-
                 Configuration configuration = editConfiguration();
                 configuration.put(CONFIG_MAC_ADDRESS, macAddress);
                 updateConfiguration(configuration);

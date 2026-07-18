@@ -73,6 +73,7 @@ The `host` bridge has the following configuration parameters:
 | `trustAllCertificates` | no       | false   | Disable TLS certificate validation (needed for the default self-signed Proxmox certificate).                         |
 | `macAddress`           | no       |         | MAC address of the host, used to power it on via Wake on LAN. If left empty, the binding tries to auto-detect it via ARP. |
 | `pollingInterval`      | no       | 30      | Seconds between two polls of the Proxmox API.                                                                         |
+| `requestTimeout`       | no       | 5       | Maximum time in seconds to wait for a response from the Proxmox API.                                                  |
 
 ## Thing Configuration
 

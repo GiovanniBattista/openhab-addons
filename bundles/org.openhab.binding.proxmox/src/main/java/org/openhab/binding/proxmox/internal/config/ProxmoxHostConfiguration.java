@@ -31,6 +31,7 @@ public class ProxmoxHostConfiguration {
 
     private boolean trustAllCertificates = false;
     private int pollingInterval = 30;
+    private int requestTimeout = 5;
 
     /**
      * @return the baseUrl
@@ -85,13 +86,6 @@ public class ProxmoxHostConfiguration {
     }
 
     /**
-     * @param macAddress the macAddress to set
-     */
-    public void setMacAddress(String macAddress) {
-        this.macAddress = macAddress;
-    }
-
-    /**
      * @return the macAddress
      */
     public @Nullable String getMacAddress() {
@@ -103,5 +97,12 @@ public class ProxmoxHostConfiguration {
      */
     public int getPollingInterval() {
         return pollingInterval;
+    }
+
+    /**
+     * @return the request timeout in seconds
+     */
+    public int getRequestTimeout() {
+        return requestTimeout;
     }
 }

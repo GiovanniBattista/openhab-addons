@@ -42,7 +42,7 @@ import com.google.gson.JsonObject;
 public class ProxmoxRequestHelper {
 
     private static final String API_BASE_PATH = "api2/json";
-    private static final int REQUEST_TIMEOUT_MILLIS = 5000;
+    private static final int DEFAULT_REQUEST_TIMEOUT_SECONDS = 5;
 
     private final ProxmoxVEApiContext context;
     private final String apiUrl;
@@ -84,8 +84,12 @@ public class ProxmoxRequestHelper {
 
     private Request newRequest(String path) {
         String validPath = path.startsWith("/") ? path : "/" + path;
-        return context.getHttpClient().newRequest(apiUrl + validPath)
-                .timeout(REQUEST_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS).accept("application/json");
+        int timeoutSeconds = context.getConfig().getRequestTimeout();
+        if (timeoutSeconds < 1) {
+            timeoutSeconds = DEFAULT_REQUEST_TIMEOUT_SECONDS;
+        }
+        return context.getHttpClient().newRequest(apiUrl + validPath).timeout(timeoutSeconds, TimeUnit.SECONDS)
+                .accept("application/json");
     }
 
     public <T> T getContent(Request request, Class<T> classToExtract)

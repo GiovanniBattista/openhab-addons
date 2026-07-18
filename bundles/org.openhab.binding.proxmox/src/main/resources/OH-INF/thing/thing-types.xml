@@ -61,6 +61,13 @@
 				<description>Seconds between fetching values from the Proxmox API.</description>
 				<default>30</default>
 			</parameter>
+
+			<parameter name="requestTimeout" type="integer" min="1" step="1" unit="s">
+				<label>Request Timeout</label>
+				<description>Maximum time in seconds to wait for a response from the Proxmox API.</description>
+				<default>5</default>
+				<advanced>true</advanced>
+			</parameter>
 		</config-description>
 	</bridge-type>
 
