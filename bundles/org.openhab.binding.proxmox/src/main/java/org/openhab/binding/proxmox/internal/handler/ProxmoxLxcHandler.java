@@ -48,13 +48,15 @@ public class ProxmoxLxcHandler extends BaseThingHandler implements ProxmoxStatus
 
     private final Logger logger = LoggerFactory.getLogger(ProxmoxLxcHandler.class);
 
-    // The minimum time in ms to skip the next update cycle if a command has been issued.
-    private static final int MIN_SKIP_UPDATE_CYCLE_TIME = 10000;
+    // How long to keep the power channel on the requested state while waiting for Proxmox to confirm the transition.
+    // Containers usually stop quickly.
+    private static final long POWER_TRANSITION_TIMEOUT_MILLIS = 120000;
 
     private volatile @Nullable String nodeName;
     private volatile @Nullable String lxcId;
 
-    private long endSkipTime = 0L;
+    private volatile @Nullable OnOffType pendingPowerState;
+    private volatile long pendingPowerDeadline;
 
     public ProxmoxLxcHandler(Thing thing) {
         super(thing);
@@ -149,8 +151,7 @@ public class ProxmoxLxcHandler extends BaseThingHandler implements ProxmoxStatus
                 } else {
                     api.startLxc(node, id);
                 }
-                updateState(channel, powerState);
-                skipNextUpdateCycle();
+                setPendingPowerState(powerState);
             }
         } catch (ProxmoxApiCommunicationException ex) {
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR, ex.getMessage());
@@ -178,13 +179,41 @@ public class ProxmoxLxcHandler extends BaseThingHandler implements ProxmoxStatus
     private void updateChannels(ProxmoxLxc lxc) {
         VmStatus status = lxc.getStatus();
         updateState(CHANNEL_STATUS, status != null ? new StringType(status.toString()) : UnDefType.UNDEF);
-        updateState(CHANNEL_POWER, OnOffType.from(status == VmStatus.RUNNING));
         updateState(CHANNEL_CPU_LOAD, new QuantityType<>(lxc.getCpu() * 100.0, Units.PERCENT));
         updateState(CHANNEL_MEMORY_USED, new QuantityType<>(lxc.getMem(), Units.BYTE));
         updateState(CHANNEL_MEMORY_TOTAL, new QuantityType<>(lxc.getMaxMem(), Units.BYTE));
         updateState(CHANNEL_DISK_USED, new QuantityType<>(lxc.getDisk(), Units.BYTE));
         updateState(CHANNEL_DISK_TOTAL, new QuantityType<>(lxc.getMaxDisk(), Units.BYTE));
         updateState(CHANNEL_UPTIME, new QuantityType<>(lxc.getUptime(), Units.SECOND));
+        updatePowerChannel(status);
+    }
+
+    /**
+     * Records the requested power state and shows it immediately; it is then held by {@link #updatePowerChannel} until
+     * Proxmox confirms the transition.
+     */
+    private void setPendingPowerState(OnOffType state) {
+        pendingPowerState = state;
+        pendingPowerDeadline = System.currentTimeMillis() + POWER_TRANSITION_TIMEOUT_MILLIS;
+        updateState(CHANNEL_POWER, state);
+    }
+
+    /**
+     * Updates the power channel from the reported status, but keeps a pending requested state until the status confirms
+     * it or the transition times out.
+     */
+    private void updatePowerChannel(@Nullable VmStatus status) {
+        OnOffType actual = OnOffType.from(status == VmStatus.RUNNING);
+        OnOffType pending = pendingPowerState;
+        if (pending != null) {
+            if (actual == pending || System.currentTimeMillis() > pendingPowerDeadline) {
+                pendingPowerState = null;
+            } else {
+                updateState(CHANNEL_POWER, pending);
+                return;
+            }
+        }
+        updateState(CHANNEL_POWER, actual);
     }
 
     @Override
@@ -201,10 +230,6 @@ public class ProxmoxLxcHandler extends BaseThingHandler implements ProxmoxStatus
         }
     }
 
-    private void skipNextUpdateCycle() {
-        endSkipTime = System.currentTimeMillis() + MIN_SKIP_UPDATE_CYCLE_TIME;
-    }
-
     private @Nullable ProxmoxVEApi getApi() {
         return ProxmoxHostBridgeHandlerHelper.getApi(getBridge());
     }
@@ -213,11 +238,6 @@ public class ProxmoxLxcHandler extends BaseThingHandler implements ProxmoxStatus
     @Override
     public boolean onStateChanged(ProxmoxLxc lxc) {
         logger.trace("onStateChanged was called!");
-
-        if (System.currentTimeMillis() <= endSkipTime) {
-            logger.debug("Skipping update cycle for id: {}", lxcId);
-            return false;
-        }
 
         updateChannels(lxc);
         return true;

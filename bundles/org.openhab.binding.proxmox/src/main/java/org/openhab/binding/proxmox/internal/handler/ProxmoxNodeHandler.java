@@ -49,12 +49,14 @@ public class ProxmoxNodeHandler extends BaseThingHandler implements ProxmoxStatu
 
     private final Logger logger = LoggerFactory.getLogger(ProxmoxNodeHandler.class);
 
-    // The minimum time in ms to skip the next update cycle if a command has been issued.
-    private static final int MIN_SKIP_UPDATE_CYCLE_TIME = 30000;
+    // How long to keep the power channel on the requested state while waiting for Proxmox to confirm the transition.
+    // A node shutdown stops all guests first, so it needs a generous budget.
+    private static final long POWER_TRANSITION_TIMEOUT_MILLIS = 300000;
 
     private volatile @Nullable String nodeName;
 
-    private long endSkipTime = 0L;
+    private volatile @Nullable OnOffType pendingPowerState;
+    private volatile long pendingPowerDeadline;
 
     public ProxmoxNodeHandler(Thing thing) {
         super(thing);
@@ -147,8 +149,7 @@ public class ProxmoxNodeHandler extends BaseThingHandler implements ProxmoxStatu
                         api.wakeonlanNode(node);
                     }
                 }
-                updateState(channel, powerState);
-                skipNextUpdateCycle();
+                setPendingPowerState(powerState);
             }
         } catch (ProxmoxApiCommunicationException ex) {
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.COMMUNICATION_ERROR, ex.getMessage());
@@ -176,17 +177,41 @@ public class ProxmoxNodeHandler extends BaseThingHandler implements ProxmoxStatu
     private void updateChannels(ProxmoxNode node) {
         NodeStatus status = node.getStatus();
         updateState(CHANNEL_STATUS, status != null ? new StringType(status.toString()) : UnDefType.UNDEF);
-        updateState(CHANNEL_POWER, OnOffType.from(status == NodeStatus.ONLINE));
         updateState(CHANNEL_CPU_LOAD, new QuantityType<>(node.getCpu() * 100.0, Units.PERCENT));
         updateState(CHANNEL_MEMORY_USED, new QuantityType<>(node.getMem(), Units.BYTE));
         updateState(CHANNEL_MEMORY_TOTAL, new QuantityType<>(node.getMaxmem(), Units.BYTE));
         updateState(CHANNEL_DISK_USED, new QuantityType<>(node.getDisk(), Units.BYTE));
         updateState(CHANNEL_DISK_TOTAL, new QuantityType<>(node.getMaxdisk(), Units.BYTE));
         updateState(CHANNEL_UPTIME, new QuantityType<>(node.getUptime(), Units.SECOND));
+        updatePowerChannel(status);
     }
 
-    private void skipNextUpdateCycle() {
-        endSkipTime = System.currentTimeMillis() + MIN_SKIP_UPDATE_CYCLE_TIME;
+    /**
+     * Records the requested power state and shows it immediately; it is then held by {@link #updatePowerChannel} until
+     * Proxmox confirms the transition.
+     */
+    private void setPendingPowerState(OnOffType state) {
+        pendingPowerState = state;
+        pendingPowerDeadline = System.currentTimeMillis() + POWER_TRANSITION_TIMEOUT_MILLIS;
+        updateState(CHANNEL_POWER, state);
+    }
+
+    /**
+     * Updates the power channel from the reported status, but keeps a pending requested state until the status confirms
+     * it or the transition times out (a node shutdown stops all guests first and can take minutes).
+     */
+    private void updatePowerChannel(@Nullable NodeStatus status) {
+        OnOffType actual = OnOffType.from(status == NodeStatus.ONLINE);
+        OnOffType pending = pendingPowerState;
+        if (pending != null) {
+            if (actual == pending || System.currentTimeMillis() > pendingPowerDeadline) {
+                pendingPowerState = null;
+            } else {
+                updateState(CHANNEL_POWER, pending);
+                return;
+            }
+        }
+        updateState(CHANNEL_POWER, actual);
     }
 
     private @Nullable ProxmoxVEApi getApi() {
@@ -211,12 +236,6 @@ public class ProxmoxNodeHandler extends BaseThingHandler implements ProxmoxStatu
     @Override
     public boolean onStateChanged(ProxmoxNode node) {
         logger.trace("onStateChanged was called!");
-
-        if (System.currentTimeMillis() <= endSkipTime) {
-            logger.debug("Skipping update cycle for id: {}", nodeName);
-            return false;
-        }
-
         updateChannels(node);
         return true;
     }

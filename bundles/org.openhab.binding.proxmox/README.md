@@ -95,7 +95,7 @@ All telemetry channels are read-only. The `power` channel is the only writable c
 | `disk-total`   | Number:DataAmount   | Maximum available disk space.                                                                                |
 | `uptime`       | Number:Time         | Time elapsed since the last boot.                                                                            |
 
-> Note: Sending `OFF` to the `power` channel of a `node` shuts down the physical host. Use it with care.
+> Note: Sending `OFF` to the `power` channel of a `node` triggers an orderly shutdown of the physical host via the Proxmox API (which also stops the guests running on it); `ON` wakes it again via Wake on LAN. This is intended for deliberate control, e.g. shutting the server down on a schedule - keep in mind that any `OFF` command, including one from a rule, will power the host off.
 
 ## Full Example
 
