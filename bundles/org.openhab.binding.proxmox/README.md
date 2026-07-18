@@ -17,6 +17,10 @@ It connects to the Proxmox VE REST API, automatically discovers the nodes, virtu
 | `vm`       | Thing  | A QEMU virtual machine running on a node.                               |
 | `lxc`      | Thing  | A Linux container (LXC) running on a node.                              |
 
+The Thing status reflects whether the binding can reach and manage the object, not whether the guest is powered on.
+A node, VM or container that exists in Proxmox stays `ONLINE` even while it is stopped - its running state is exposed through the `power` and `status` channels.
+A Thing only goes `OFFLINE` when its bridge is offline or when the object is removed from Proxmox.
+
 ## Discovery
 
 Once a `host` bridge is configured and `ONLINE`, its nodes, VMs and containers are discovered automatically and appear in the inbox.
@@ -40,15 +44,35 @@ It is therefore recommended to create a dedicated user for the binding:
 1. Open _Datacenter → Permissions → Roles_ and create a new role (e.g. `openhab`) with the privileges `Sys.PowerMgmt`, `VM.Audit` and `VM.PowerMgmt`.
 1. Open _Datacenter → Permissions_ and add a new permission for path `/`, the `openhab` user and the role created above.
 
+### Authentication
+
+The binding supports two authentication methods:
+
+- **API token (recommended):** Open _Datacenter → Permissions → API Tokens_, create a token for the user above and copy the token id (e.g. `openhab@pam!mytoken`) and the secret shown once on creation into `apiTokenId` and `apiTokenSecret`. This avoids storing the account password in openHAB and needs no CSRF handling.
+- **User name and password:** Set `username` (including the realm, e.g. `openhab@pam`) and `password`.
+
+Provide either an API token or a user name and password. If both are set, the API token takes precedence.
+
+### TLS
+
+Proxmox VE uses a self-signed certificate by default, which the Java runtime does not trust.
+In that case enable `trustAllCertificates` to skip certificate validation.
+If the host presents a certificate trusted by the runtime (e.g. via a company CA or Let's Encrypt), leave it disabled.
+
+### Parameters
+
 The `host` bridge has the following configuration parameters:
 
-| Parameter         | Required | Default | Description                                                                                                            |
-|-------------------|----------|---------|----------------------------------------------------------------------------------------------------------------------|
-| `baseUrl`         | yes      |         | Base URL of the Proxmox VE API, e.g. `https://pve:8006/`.                                                             |
-| `username`        | yes      |         | User name including the realm, e.g. `openhab@pam`.                                                                    |
-| `password`        | yes      |         | Password of the API user.                                                                                            |
-| `macAddress`      | no       |         | MAC address of the host, used to power it on via Wake on LAN. If left empty, the binding tries to auto-detect it via ARP. |
-| `pollingInterval` | no       | 30      | Seconds between two polls of the Proxmox API.                                                                         |
+| Parameter              | Required | Default | Description                                                                                                            |
+|------------------------|----------|---------|----------------------------------------------------------------------------------------------------------------------|
+| `baseUrl`              | yes      |         | Base URL of the Proxmox VE API, e.g. `https://pve:8006/`.                                                             |
+| `username`             | no       |         | User name including the realm, e.g. `openhab@pam`. Required unless an API token is used.                              |
+| `password`             | no       |         | Password of the API user. Required unless an API token is used.                                                      |
+| `apiTokenId`           | no       |         | Full API token id including user and realm, e.g. `openhab@pam!mytoken`.                                               |
+| `apiTokenSecret`       | no       |         | The token secret (UUID) shown once on creation.                                                                      |
+| `trustAllCertificates` | no       | false   | Disable TLS certificate validation (needed for the default self-signed Proxmox certificate).                         |
+| `macAddress`           | no       |         | MAC address of the host, used to power it on via Wake on LAN. If left empty, the binding tries to auto-detect it via ARP. |
+| `pollingInterval`      | no       | 30      | Seconds between two polls of the Proxmox API.                                                                         |
 
 ## Thing Configuration
 
@@ -77,7 +101,8 @@ All telemetry channels are read-only. The `power` channel is the only writable c
 `proxmox.things`:
 
 ```java
-Bridge proxmox:host:pve "Proxmox Host" [ baseUrl="https://pve:8006/", username="openhab@pam", password="secret", pollingInterval=30 ] {
+// Using an API token (recommended) with a self-signed certificate:
+Bridge proxmox:host:pve "Proxmox Host" [ baseUrl="https://pve:8006/", apiTokenId="openhab@pam!mytoken", apiTokenSecret="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx", trustAllCertificates=true, pollingInterval=30 ] {
     Thing node pve    "Proxmox Node pve"
     Thing vm   100    "Home Assistant VM"
     Thing lxc  101    "Pi-hole Container"

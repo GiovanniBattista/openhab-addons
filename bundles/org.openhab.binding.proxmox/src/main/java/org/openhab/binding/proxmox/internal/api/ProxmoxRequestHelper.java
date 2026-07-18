@@ -19,6 +19,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
+import javax.net.ssl.SSLException;
+
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.eclipse.jetty.client.api.ContentResponse;
@@ -127,8 +129,35 @@ public class ProxmoxRequestHelper {
         } catch (TimeoutException ex) {
             throw new ProxmoxApiCommunicationException("Request - Timeout reached", ex);
         } catch (ExecutionException ex) {
-            throw new ProxmoxApiCommunicationException("Request failed", ex);
+            throw new ProxmoxApiCommunicationException("Request failed: " + describeExecutionFailure(ex), ex);
         }
+    }
+
+    /**
+     * Builds a human readable description from an {@link ExecutionException} thrown by the HTTP client. The generic
+     * "Request failed" is not helpful on its own, so the underlying cause (e.g. a TLS handshake or connection error) is
+     * surfaced, with a hint for the very common self-signed certificate case.
+     */
+    private static String describeExecutionFailure(ExecutionException ex) {
+        Throwable cause = ex.getCause();
+        if (cause == null) {
+            String message = ex.getMessage();
+            return message != null ? message : ex.toString();
+        }
+
+        StringBuilder builder = new StringBuilder(cause.getClass().getSimpleName());
+        String message = cause.getMessage();
+        if (message != null && !message.isBlank()) {
+            builder.append(": ").append(message);
+        }
+        for (Throwable current = cause; current != null; current = current.getCause()) {
+            if (current instanceof SSLException) {
+                builder.append(
+                        " (if the Proxmox host uses a self-signed certificate, enable 'Trust All Certificates' in the bridge configuration)");
+                break;
+            }
+        }
+        return builder.toString();
     }
 
     private void checkStatus(ContentResponse response)

@@ -25,8 +25,11 @@ public class ProxmoxHostConfiguration {
     private @Nullable String baseUrl;
     private @Nullable String username;
     private @Nullable String password;
+    private @Nullable String apiTokenId;
+    private @Nullable String apiTokenSecret;
     private @Nullable String macAddress;
 
+    private boolean trustAllCertificates = false;
     private int pollingInterval = 30;
 
     /**
@@ -48,6 +51,37 @@ public class ProxmoxHostConfiguration {
      */
     public @Nullable String getPassword() {
         return password;
+    }
+
+    /**
+     * @return the full API token identifier including user and realm, e.g. {@code openhab@pam!mytoken}
+     */
+    public @Nullable String getApiTokenId() {
+        return apiTokenId;
+    }
+
+    /**
+     * @return the secret (UUID) of the API token
+     */
+    public @Nullable String getApiTokenSecret() {
+        return apiTokenSecret;
+    }
+
+    /**
+     * @return whether an API token (id and secret) is configured and should be used for authentication
+     */
+    public boolean usesApiToken() {
+        String id = apiTokenId;
+        String secret = apiTokenSecret;
+        return id != null && !id.isBlank() && secret != null && !secret.isBlank();
+    }
+
+    /**
+     * @return whether TLS certificates of the host should not be validated (needed for the self-signed certificate
+     *         Proxmox VE uses by default)
+     */
+    public boolean isTrustAllCertificates() {
+        return trustAllCertificates;
     }
 
     /**

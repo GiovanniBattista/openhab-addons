@@ -16,6 +16,7 @@ import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jetty.client.HttpClient;
 import org.openhab.binding.proxmox.internal.api.auth.Authorization;
 import org.openhab.binding.proxmox.internal.api.auth.ProxmoxAuthentication;
+import org.openhab.binding.proxmox.internal.api.auth.TokenAuthentication;
 import org.openhab.binding.proxmox.internal.config.ProxmoxHostConfiguration;
 
 import com.google.gson.Gson;
@@ -31,7 +32,9 @@ public class ProxmoxVEApiFactory {
         Gson gson = GsonBuilderFactory.defaultBuilder().create();
         ProxmoxVEApiContext context = ProxmoxVEApiContext.of(config, httpClient, gson);
 
-        Authorization auth = new ProxmoxAuthentication(context);
+        // Prefer stateless API token authentication over the ticket/password based one when a token is configured.
+        Authorization auth = config.usesApiToken() ? new TokenAuthentication(context)
+                : new ProxmoxAuthentication(context);
         return new ProxmoxVEApi(context, auth);
     }
 }

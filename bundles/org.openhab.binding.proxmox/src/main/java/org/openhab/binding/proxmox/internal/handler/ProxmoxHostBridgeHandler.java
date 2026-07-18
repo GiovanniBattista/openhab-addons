@@ -31,6 +31,7 @@ import java.util.concurrent.locks.ReentrantLock;
 import org.eclipse.jdt.annotation.NonNullByDefault;
 import org.eclipse.jdt.annotation.Nullable;
 import org.eclipse.jetty.client.HttpClient;
+import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.openhab.binding.proxmox.internal.api.ProxmoxVEApi;
 import org.openhab.binding.proxmox.internal.api.ProxmoxVEApiFactory;
 import org.openhab.binding.proxmox.internal.api.exception.ProxmoxApiCommunicationException;
@@ -43,6 +44,7 @@ import org.openhab.binding.proxmox.internal.config.ProxmoxHostConfiguration;
 import org.openhab.binding.proxmox.internal.discovery.ProxmoxDiscoveryService;
 import org.openhab.binding.proxmox.internal.utils.WakeOnLanUtility;
 import org.openhab.core.config.core.Configuration;
+import org.openhab.core.io.net.http.HttpClientFactory;
 import org.openhab.core.thing.Bridge;
 import org.openhab.core.thing.ChannelUID;
 import org.openhab.core.thing.ThingStatus;
@@ -70,7 +72,9 @@ public class ProxmoxHostBridgeHandler extends BaseBridgeHandler {
 
     private volatile ProxmoxHostConfiguration config = new ProxmoxHostConfiguration();
     private volatile @Nullable ProxmoxVEApi api;
-    private final HttpClient httpClient;
+    private final HttpClientFactory httpClientFactory;
+    // Only set when this handler owns a private (trust-all) client that it has to stop again on dispose.
+    private @Nullable HttpClient ownHttpClient;
 
     private final Map<String, ProxmoxNode> lastNodeStates = new ConcurrentHashMap<>();
     private final Map<String, ProxmoxVm> lastVmStates = new ConcurrentHashMap<>();
@@ -84,9 +88,9 @@ public class ProxmoxHostBridgeHandler extends BaseBridgeHandler {
     private final ReentrantLock pollingLock = new ReentrantLock();
     private @Nullable ScheduledFuture<?> proxmoxPollingJob;
 
-    public ProxmoxHostBridgeHandler(Bridge bridge, HttpClient httpClient) {
+    public ProxmoxHostBridgeHandler(Bridge bridge, HttpClientFactory httpClientFactory) {
         super(bridge);
-        this.httpClient = httpClient;
+        this.httpClientFactory = httpClientFactory;
     }
 
     @Override
@@ -95,11 +99,10 @@ public class ProxmoxHostBridgeHandler extends BaseBridgeHandler {
 
         ProxmoxHostConfiguration config = getConfigAs(ProxmoxHostConfiguration.class);
         this.config = config;
-        this.api = ProxmoxVEApiFactory.create(config, httpClient);
 
         String baseUrl = config.getBaseUrl();
         if (baseUrl == null || baseUrl.isEmpty()) {
-            updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR, "No base url set");
+            updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR, "No base URL set");
             return;
         }
 
@@ -107,26 +110,64 @@ public class ProxmoxHostBridgeHandler extends BaseBridgeHandler {
             new URI(baseUrl).toURL();
         } catch (URISyntaxException | MalformedURLException | IllegalArgumentException ex) {
             updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR,
-                    "Invalid base url: " + ex.getMessage());
+                    "Invalid base URL: " + ex.getMessage());
             return;
         }
 
-        String username = config.getUsername();
-        if (username == null || username.isEmpty()) {
-            updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR, "No username set");
-            return;
+        if (!config.usesApiToken()) {
+            String username = config.getUsername();
+            String password = config.getPassword();
+            if (username == null || username.isEmpty() || password == null || password.isEmpty()) {
+                updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR,
+                        "Provide either an API token (id and secret) or a user name and password");
+                return;
+            }
         }
 
-        String password = config.getPassword();
-        if (password == null || password.isEmpty()) {
-            updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR, "No password set");
+        HttpClient httpClient;
+        try {
+            httpClient = createHttpClient(config);
+        } catch (ProxmoxApiConfigurationException ex) {
+            updateStatus(ThingStatus.OFFLINE, ThingStatusDetail.CONFIGURATION_ERROR, ex.getMessage());
             return;
         }
+        this.api = ProxmoxVEApiFactory.create(config, httpClient);
 
         // Set the thing status to UNKNOWN temporarily and let the background polling task decide the real status.
         updateStatus(ThingStatus.UNKNOWN);
 
         startProxmoxPolling();
+    }
+
+    /**
+     * Returns the {@link HttpClient} to use for this bridge. When TLS validation is disabled a private trust-all client
+     * is created (and later stopped on {@link #dispose()}); otherwise the shared common client is reused.
+     */
+    private HttpClient createHttpClient(ProxmoxHostConfiguration config) throws ProxmoxApiConfigurationException {
+        stopOwnHttpClient();
+        if (config.isTrustAllCertificates()) {
+            HttpClient client = new HttpClient(new SslContextFactory.Client(true));
+            try {
+                client.start();
+            } catch (Exception ex) {
+                throw new ProxmoxApiConfigurationException("Could not start HTTP client: " + ex.getMessage(), ex);
+            }
+            ownHttpClient = client;
+            return client;
+        }
+        return httpClientFactory.getCommonHttpClient();
+    }
+
+    private void stopOwnHttpClient() {
+        HttpClient client = ownHttpClient;
+        ownHttpClient = null;
+        if (client != null) {
+            try {
+                client.stop();
+            } catch (Exception ex) {
+                logger.debug("Failed to stop HTTP client: {}", ex.getMessage());
+            }
+        }
     }
 
     private void startProxmoxPolling() {
@@ -160,6 +201,7 @@ public class ProxmoxHostBridgeHandler extends BaseBridgeHandler {
     public void dispose() {
         super.dispose();
         stopProxmoxPolling();
+        stopOwnHttpClient();
     }
 
     public @Nullable ProxmoxVEApi getApi() {

@@ -15,16 +15,37 @@
 				<context>url</context>
 			</parameter>
 
-			<parameter name="username" type="text" required="true">
+			<parameter name="username" type="text" required="false">
 				<label>User Name</label>
 				<description>User name for the Proxmox REST API including the realm, e.g. openhab@pam. Must have the proper access
-					rights.</description>
+					rights. Required unless an API token is used.</description>
 			</parameter>
 
-			<parameter name="password" type="text" required="true">
+			<parameter name="password" type="text" required="false">
 				<label>Password</label>
-				<description>Password for the Proxmox REST API.</description>
+				<description>Password for the Proxmox REST API. Required unless an API token is used.</description>
 				<context>password</context>
+			</parameter>
+
+			<parameter name="apiTokenId" type="text" required="false">
+				<label>API Token</label>
+				<description>Full identifier of a Proxmox API token including user and realm, e.g. openhab@pam!mytoken. When set
+					together with the API token secret, token authentication is used instead of user name and password (recommended).
+					Create it under Datacenter / Permissions / API Tokens.</description>
+			</parameter>
+
+			<parameter name="apiTokenSecret" type="text" required="false">
+				<label>API Token Secret</label>
+				<description>The secret (UUID) shown once when the API token is created.</description>
+				<context>password</context>
+			</parameter>
+
+			<parameter name="trustAllCertificates" type="boolean" required="false">
+				<label>Trust All Certificates</label>
+				<description>Disable TLS certificate validation. Enable this if the Proxmox host uses the default self-signed
+					certificate. Leave disabled if the host presents a certificate trusted by the Java runtime.</description>
+				<default>false</default>
+				<advanced>true</advanced>
 			</parameter>
 
 			<parameter name="macAddress" type="text" required="false">
